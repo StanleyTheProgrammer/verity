@@ -2,39 +2,682 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Phaser Square</title>
-  <script src="https://jsdelivr.net"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Environment Battle</title>
   <style>
-    body {
+    * {
       margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      background: #1a2e1a;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background-color: #1a1a1a;
+      min-height: 100vh;
+      font-family: 'Arial Black', 'Impact', sans-serif;
+      touch-action: pan-y;
+    }
+    #game-container {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
     }
   </style>
 </head>
 <body>
+  <div id="game-container"></div>
 
-<script>
-  const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#2d2d2d',
-    scene: {
-      create: create
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script>
+    // ============================================================
+    //  ENVIRONMENT BATTLE - Phaser 3 Game
+    //  Split screen, trash catching, AI or 2P, maps & skins
+    // ============================================================
+
+    // ---------- CONFIG ----------
+    const GAME_WIDTH = 960;
+    const GAME_HEIGHT = 720;
+
+    // ---------- GLOBAL SCENE ----------
+    class BootScene extends Phaser.Scene {
+      constructor() { super('Boot'); }
+      preload() {
+        // We'll generate textures procedurally to keep everything in one file.
+        // No external assets needed.
+      }
+      create() {
+        // Generate all textures programmatically
+        this.createTextures();
+        this.scene.start('Menu');
+      }
+
+      createTextures() {
+        const g = this.make.graphics({ x: 0, y: 0, add: false });
+
+        // ---- TRASH ITEMS (different colors & shapes) ----
+        // 1. Can (grey/red)
+        g.clear(); g.fillStyle(0xbbbbbb); g.fillRect(4, 8, 20, 28); g.fillStyle(0xcc3333); g.fillRect(4, 8, 20, 8); g.fillStyle(0x888888); g.fillRect(6, 14, 16, 4); g.generateTexture('trashCan', 28, 40);
+        // 2. Bottle (green)
+        g.clear(); g.fillStyle(0x44aa44); g.fillRect(8, 6, 12, 30); g.fillStyle(0x66cc66); g.fillRect(6, 2, 16, 8); g.generateTexture('trashBottle', 28, 40);
+        // 3. Bag (black)
+        g.clear(); g.fillStyle(0x333333); g.fillCircle(14, 20, 12); g.fillStyle(0x555555); g.fillCircle(10, 16, 4); g.generateTexture('trashBag', 28, 40);
+        // 4. Paper (white)
+        g.clear(); g.fillStyle(0xeeeeee); g.fillRect(2, 10, 24, 20); g.fillStyle(0xcccccc); g.fillRect(4, 14, 20, 4); g.generateTexture('trashPaper', 28, 40);
+        // 5. Box (brown)
+        g.clear(); g.fillStyle(0xaa8866); g.fillRect(2, 8, 24, 24); g.fillStyle(0x886644); g.fillRect(2, 8, 24, 4); g.generateTexture('trashBox', 28, 40);
+
+        // ---- NON-TRASH ITEMS (avoid) ----
+        // Apple (red)
+        g.clear(); g.fillStyle(0xee3333); g.fillCircle(14, 20, 12); g.fillStyle(0x44aa44); g.fillRect(12, 6, 4, 8); g.generateTexture('apple', 28, 40);
+        // Orange (orange)
+        g.clear(); g.fillStyle(0xff8800); g.fillCircle(14, 20, 12); g.fillStyle(0xcc6600); g.fillRect(12, 6, 4, 8); g.generateTexture('orange', 28, 40);
+        // Everyday item: Cup (blue)
+        g.clear(); g.fillStyle(0x4488ff); g.fillRect(6, 10, 16, 22); g.fillStyle(0x2266cc); g.fillRect(4, 8, 20, 6); g.generateTexture('cup', 28, 40);
+
+        // ---- ANVIL ----
+        g.clear(); g.fillStyle(0x444444); g.fillRect(0, 10, 48, 30); g.fillStyle(0x666666); g.fillRect(4, 14, 40, 12); g.fillStyle(0x222222); g.fillRect(12, 6, 24, 6); g.generateTexture('anvil', 48, 40);
+
+        // ---- PLAYER SKINS ----
+        // Default / Player 1 (green shirt)
+        g.clear(); g.fillStyle(0x44aa44); g.fillRect(8, 10, 20, 24); // body
+        g.fillStyle(0xffccaa); g.fillCircle(18, 8, 8); // head
+        g.fillStyle(0x222222); g.fillRect(10, 20, 4, 8); g.fillRect(22, 20, 4, 8); // legs
+        g.generateTexture('player1', 36, 44);
+
+        // Player 2 / AI variants
+        // Michael Jackson (black shirt, hat)
+        g.clear(); g.fillStyle(0x222222); g.fillRect(8, 10, 20, 24);
+        g.fillStyle(0xffccaa); g.fillCircle(18, 8, 8);
+        g.fillStyle(0x111111); g.fillRect(6, 0, 24, 6); // hat
+        g.fillStyle(0x222222); g.fillRect(10, 20, 4, 8); g.fillRect(22, 20, 4, 8);
+        g.generateTexture('playerMJ', 36, 44);
+
+        // Verity (blue/white)
+        g.clear(); g.fillStyle(0x4488ff); g.fillRect(8, 10, 20, 24);
+        g.fillStyle(0xffddcc); g.fillCircle(18, 8, 8);
+        g.fillStyle(0xffffff); g.fillRect(10, 20, 4, 8); g.fillRect(22, 20, 4, 8);
+        g.generateTexture('playerVerity', 36, 44);
+
+        // Falsity (red/black)
+        g.clear(); g.fillStyle(0xcc3333); g.fillRect(8, 10, 20, 24);
+        g.fillStyle(0xffccaa); g.fillCircle(18, 8, 8);
+        g.fillStyle(0x222222); g.fillRect(10, 20, 4, 8); g.fillRect(22, 20, 4, 8);
+        g.generateTexture('playerFalsity', 36, 44);
+
+        // Monkey (brown)
+        g.clear(); g.fillStyle(0x8B5A2B); g.fillRect(8, 10, 20, 24);
+        g.fillStyle(0xC68642); g.fillCircle(18, 8, 8);
+        g.fillStyle(0x5C3317); g.fillRect(10, 20, 4, 8); g.fillRect(22, 20, 4, 8);
+        g.generateTexture('playerMonkey', 36, 44);
+
+        // ---- TRASH BIN (held by player) ----
+        g.clear(); g.fillStyle(0x888888); g.fillRect(0, 0, 40, 30); g.fillStyle(0xaaaaaa); g.fillRect(4, 4, 32, 22); g.fillStyle(0x666666); g.fillRect(0, 0, 40, 4); g.generateTexture('bin', 40, 30);
+
+        // ---- MAP BACKGROUNDS (procedural) ----
+        // Map 1: Park
+        g.clear(); g.fillStyle(0x3a5f3a); g.fillRect(0, 0, 480, 720); 
+        g.fillStyle(0x4a7a4a); for(let i=0;i<20;i++){ g.fillCircle(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(10,30)); }
+        g.generateTexture('mapPark', 480, 720);
+
+        // Map 2: City
+        g.clear(); g.fillStyle(0x2a2a3a); g.fillRect(0, 0, 480, 720);
+        g.fillStyle(0x4a4a6a); for(let i=0;i<15;i++){ g.fillRect(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(20,50), Phaser.Math.Between(10,20)); }
+        g.generateTexture('mapCity', 480, 720);
+
+        // Map 3: Beach
+        g.clear(); g.fillStyle(0xeedd99); g.fillRect(0, 0, 480, 720);
+        g.fillStyle(0x4488cc); for(let i=0;i<8;i++){ g.fillEllipse(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(30,80), Phaser.Math.Between(10,30)); }
+        g.generateTexture('mapBeach', 480, 720);
+
+        // Map 4: Snow
+        g.clear(); g.fillStyle(0xccddee); g.fillRect(0, 0, 480, 720);
+        g.fillStyle(0xffffff); for(let i=0;i<30;i++){ g.fillCircle(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(4,12)); }
+        g.generateTexture('mapSnow', 480, 720);
+
+        // ---- UI elements ----
+        g.clear(); g.fillStyle(0x000000, 0.6); g.fillRect(0, 0, 480, 80); g.generateTexture('hudBg', 480, 80);
+
+        // ---- PARTICLE ----
+        g.clear(); g.fillStyle(0xffffaa); g.fillCircle(4, 4, 4); g.generateTexture('spark', 8, 8);
+
+        g.destroy();
+      }
     }
-  };
 
-  const game = new Phaser.Game(config);
+    // ---------- MENU SCENE ----------
+    class MenuScene extends Phaser.Scene {
+      constructor() { super('Menu'); }
 
-  function create() {
-    // Draws a 100x100 green square at the center (400, 300)
-    this.add.rectangle(400, 300, 100, 100, 0x00ff00);
-  }
-</script>
+      create() {
+        this.add.text(GAME_WIDTH/2, 60, '🌍 ENVIRONMENT BATTLE', {
+          fontFamily: 'Arial Black', fontSize: '42px', color: '#ffffff', stroke: '#2a6a2a', strokeThickness: 6
+        }).setOrigin(0.5);
 
+        this.add.text(GAME_WIDTH/2, 120, 'Catch trash, avoid hazards!', {
+          fontFamily: 'Arial', fontSize: '18px', color: '#cccccc'
+        }).setOrigin(0.5);
+
+        // ---- MODE SELECTION ----
+        const btnStyle = { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff', backgroundColor: '#2a6a2a', padding: { x: 20, y: 10 } };
+
+        const twoP = this.add.text(GAME_WIDTH/2, 220, '👥 2 PLAYERS (local)', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        twoP.on('pointerdown', () => this.startGame('2p'));
+
+        const vsAI = this.add.text(GAME_WIDTH/2, 300, '🤖 VS AI', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        vsAI.on('pointerdown', () => this.showAISelect());
+
+        // ---- MAP SELECTION (shared) ----
+        this.add.text(GAME_WIDTH/2, 420, 'SELECT MAP', { fontFamily: 'Arial Black', fontSize: '22px', color: '#fff' }).setOrigin(0.5);
+        this.mapKeys = ['mapPark', 'mapCity', 'mapBeach', 'mapSnow'];
+        this.mapNames = ['🌳 Park', '🏙️ City', '🏖️ Beach', '❄️ Snow'];
+        this.selectedMap = 0;
+
+        this.mapButtons = [];
+        for (let i = 0; i < 4; i++) {
+          const btn = this.add.text(GAME_WIDTH/2 - 180 + i * 120, 480, this.mapNames[i], {
+            fontFamily: 'Arial', fontSize: '16px', color: '#fff',
+            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 10, y: 8 }
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          btn.on('pointerdown', () => {
+            this.selectedMap = i;
+            this.mapButtons.forEach((b, j) => b.setBackgroundColor(j === i ? '#4a8a4a' : '#2a4a2a'));
+          });
+          this.mapButtons.push(btn);
+        }
+
+        // ---- PLAYER SKIN CUSTOMIZATION ----
+        this.add.text(GAME_WIDTH/2, 560, 'PLAYER 1 SKIN', { fontFamily: 'Arial Black', fontSize: '16px', color: '#fff' }).setOrigin(0.5);
+        this.skinKeys = ['player1', 'playerMJ', 'playerVerity', 'playerFalsity', 'playerMonkey'];
+        this.skinNames = ['Green', 'MJ', 'Verity', 'Falsity', 'Monkey'];
+        this.p1Skin = 0;
+        this.skinButtons = [];
+        for (let i = 0; i < 5; i++) {
+          const btn = this.add.text(GAME_WIDTH/2 - 200 + i * 100, 600, this.skinNames[i], {
+            fontFamily: 'Arial', fontSize: '14px', color: '#fff',
+            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 8, y: 6 }
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          btn.on('pointerdown', () => {
+            this.p1Skin = i;
+            this.skinButtons.forEach((b, j) => b.setBackgroundColor(j === i ? '#4a8a4a' : '#2a4a2a'));
+          });
+          this.skinButtons.push(btn);
+        }
+
+        // AI selection panel (hidden initially)
+        this.aiPanel = this.add.container(0, 0).setVisible(false);
+        const aiBg = this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, 500, 350, 0x000000, 0.9).setStrokeStyle(2, 0x44aa44);
+        const aiTitle = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 130, 'CHOOSE AI OPPONENT', { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+        
+        const aiOptions = ['Michael Jackson', 'Verity', 'Falsity', 'Monkey'];
+        this.aiSkinKeys = ['playerMJ', 'playerVerity', 'playerFalsity', 'playerMonkey'];
+        this.selectedAI = 0;
+        this.aiButtons = [];
+        for (let i = 0; i < 4; i++) {
+          const btn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 70 + i * 60, aiOptions[i], {
+            fontFamily: 'Arial Black', fontSize: '20px', color: '#fff',
+            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 20, y: 8 }
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          btn.on('pointerdown', () => {
+            this.selectedAI = i;
+            this.aiButtons.forEach((b, j) => b.setBackgroundColor(j === i ? '#4a8a4a' : '#2a4a2a'));
+          });
+          this.aiButtons.push(btn);
+          this.aiPanel.add(btn);
+        }
+        const backBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 160, 'CANCEL', {
+          fontFamily: 'Arial Black', fontSize: '16px', color: '#fff', backgroundColor: '#aa3333', padding: { x: 15, y: 6 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        backBtn.on('pointerdown', () => this.aiPanel.setVisible(false));
+        this.aiPanel.add(backBtn);
+        this.aiPanel.add(aiBg);
+        this.aiPanel.add(aiTitle);
+        this.aiPanel.setDepth(100);
+      }
+
+      showAISelect() {
+        this.aiPanel.setVisible(true);
+        // Add confirm button dynamically if not exists
+        if (!this.aiConfirm) {
+          this.aiConfirm = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 100, 'START BATTLE', {
+            fontFamily: 'Arial Black', fontSize: '22px', color: '#fff', backgroundColor: '#2a6a2a', padding: { x: 25, y: 10 }
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(101);
+          this.aiConfirm.on('pointerdown', () => {
+            this.aiPanel.setVisible(false);
+            this.startGame('ai', this.selectedAI);
+          });
+        }
+        this.aiConfirm.setVisible(true);
+      }
+
+      startGame(mode, aiIndex = 0) {
+        this.scene.start('Game', {
+          mode: mode,
+          map: this.selectedMap,
+          p1Skin: this.skinKeys[this.p1Skin],
+          p2Skin: mode === '2p' ? this.skinKeys[this.p1Skin] : this.aiSkinKeys[aiIndex],
+          aiIndex: aiIndex
+        });
+      }
+    }
+
+    // ---------- MAIN GAME SCENE ----------
+    class GameScene extends Phaser.Scene {
+      constructor() { super('Game'); }
+
+      init(data) {
+        this.mode = data.mode;
+        this.mapIndex = data.map;
+        this.p1Skin = data.p1Skin || 'player1';
+        this.p2Skin = data.p2Skin || 'playerVerity';
+        this.aiIndex = data.aiIndex || 0;
+
+        // Map keys
+        this.mapKeys = ['mapPark', 'mapCity', 'mapBeach', 'mapSnow'];
+
+        // Game state
+        this.p1Score = 0;
+        this.p2Score = 0;
+        this.gameOver = false;
+
+        // Item definitions
+        this.trashItems = [
+          { key: 'trashCan', points: 10, name: 'Can' },
+          { key: 'trashBottle', points: 15, name: 'Bottle' },
+          { key: 'trashBag', points: 20, name: 'Bag' },
+          { key: 'trashPaper', points: 5, name: 'Paper' },
+          { key: 'trashBox', points: 25, name: 'Box' }
+        ];
+        this.nonTrashItems = [
+          { key: 'apple', points: -10, name: 'Apple' },
+          { key: 'orange', points: -15, name: 'Orange' },
+          { key: 'cup', points: -8, name: 'Cup' }
+        ];
+        this.anvilItem = { key: 'anvil', points: -30, name: 'Anvil' };
+
+        // Player data
+        this.p1 = { x: 200, y: 600, vx: 0, vy: 0, score: 0, stunned: false, stunTimer: 0, facing: 1, animTimer: 0 };
+        this.p2 = { x: 760, y: 600, vx: 0, vy: 0, score: 0, stunned: false, stunTimer: 0, facing: -1, animTimer: 0 };
+
+        // Falling items array
+        this.fallingItems = [];
+        this.spawnTimer = 0;
+        this.spawnInterval = 800; // ms
+
+        // Input
+        this.keys = {};
+        this.cursors = {};
+      }
+
+      create() {
+        // ---- BACKGROUNDS ----
+        // Split screen: left half map, right half map
+        this.add.image(240, 360, this.mapKeys[this.mapIndex]).setDisplaySize(480, 720);
+        this.add.image(720, 360, this.mapKeys[this.mapIndex]).setDisplaySize(480, 720);
+
+        // Divider line
+        this.add.rectangle(480, 360, 4, 720, 0xffffff, 0.8);
+
+        // HUD backgrounds
+        this.add.image(240, 40, 'hudBg').setDisplaySize(480, 80);
+        this.add.image(720, 40, 'hudBg').setDisplaySize(480, 80);
+
+        // Scores
+        this.p1ScoreText = this.add.text(240, 20, 'P1: 0', { fontFamily: 'Arial Black', fontSize: '28px', color: '#fff' }).setOrigin(0.5);
+        this.p2ScoreText = this.add.text(720, 20, 'P2: 0', { fontFamily: 'Arial Black', fontSize: '28px', color: '#fff' }).setOrigin(0.5);
+        this.p1Name = this.add.text(240, 55, this.mode === 'ai' ? 'YOU' : 'PLAYER 1', { fontFamily: 'Arial', fontSize: '14px', color: '#ccc' }).setOrigin(0.5);
+        this.p2Name = this.add.text(720, 55, this.mode === 'ai' ? this.getAIName() : 'PLAYER 2', { fontFamily: 'Arial', fontSize: '14px', color: '#ccc' }).setOrigin(0.5);
+
+        // ---- PLAYER SPRITES ----
+        this.p1Sprite = this.add.sprite(this.p1.x, this.p1.y, this.p1Skin).setDepth(10);
+        this.p2Sprite = this.add.sprite(this.p2.x, this.p2.y, this.p2Skin).setDepth(10);
+        // Bins
+        this.p1Bin = this.add.sprite(this.p1.x, this.p1.y - 30, 'bin').setDepth(11);
+        this.p2Bin = this.add.sprite(this.p2.x, this.p2.y - 30, 'bin').setDepth(11);
+
+        // ---- INPUT ----
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.keys = this.input.keyboard.addKeys({
+          a: Phaser.Input.Keyboard.KeyCodes.A,
+          d: Phaser.Input.Keyboard.KeyCodes.D,
+          w: Phaser.Input.Keyboard.KeyCodes.W,
+          s: Phaser.Input.Keyboard.KeyCodes.S,
+          left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+          right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+          up: Phaser.Input.Keyboard.KeyCodes.UP,
+          down: Phaser.Input.Keyboard.KeyCodes.DOWN
+        });
+
+        // Touch controls (virtual buttons) for mobile
+        this.createTouchControls();
+
+        // ---- SPAWN TIMER ----
+        this.time.addEvent({
+          delay: 900,
+          callback: this.spawnItem,
+          callbackScope: this,
+          loop: true
+        });
+
+        // Stun effect text
+        this.p1StunText = this.add.text(240, 200, 'STUNNED!', { fontFamily: 'Arial Black', fontSize: '28px', color: '#ff4444' }).setOrigin(0.5).setVisible(false).setDepth(20);
+        this.p2StunText = this.add.text(720, 200, 'STUNNED!', { fontFamily: 'Arial Black', fontSize: '28px', color: '#ff4444' }).setOrigin(0.5).setVisible(false).setDepth(20);
+      }
+
+      getAIName() {
+        const names = ['Michael Jackson', 'Verity', 'Falsity', 'Monkey'];
+        return names[this.aiIndex];
+      }
+
+      createTouchControls() {
+        // Simple on-screen buttons for mobile - left/right for each player
+        const btnSize = 60;
+        const yPos = GAME_HEIGHT - 60;
+
+        // P1 left/right
+        this.p1LeftBtn = this.add.rectangle(60, yPos, btnSize, btnSize, 0xffffff, 0.3).setInteractive().setDepth(30);
+        this.p1RightBtn = this.add.rectangle(140, yPos, btnSize, btnSize, 0xffffff, 0.3).setInteractive().setDepth(30);
+        this.add.text(60, yPos, '◀', { fontSize: '28px', color: '#fff' }).setOrigin(0.5).setDepth(31);
+        this.add.text(140, yPos, '▶', { fontSize: '28px', color: '#fff' }).setOrigin(0.5).setDepth(31);
+
+        // P2 left/right (or AI - AI doesn't need touch, but we'll show anyway)
+        this.p2LeftBtn = this.add.rectangle(820, yPos, btnSize, btnSize, 0xffffff, 0.3).setInteractive().setDepth(30);
+        this.p2RightBtn = this.add.rectangle(900, yPos, btnSize, btnSize, 0xffffff, 0.3).setInteractive().setDepth(30);
+        this.add.text(820, yPos, '◀', { fontSize: '28px', color: '#fff' }).setOrigin(0.5).setDepth(31);
+        this.add.text(900, yPos, '▶', { fontSize: '28px', color: '#fff' }).setOrigin(0.5).setDepth(31);
+
+        // Touch state
+        this.touchState = { p1Left: false, p1Right: false, p2Left: false, p2Right: false };
+
+        // P1 touch handlers
+        this.p1LeftBtn.on('pointerdown', () => { this.touchState.p1Left = true; });
+        this.p1LeftBtn.on('pointerup', () => { this.touchState.p1Left = false; });
+        this.p1LeftBtn.on('pointerout', () => { this.touchState.p1Left = false; });
+        this.p1RightBtn.on('pointerdown', () => { this.touchState.p1Right = true; });
+        this.p1RightBtn.on('pointerup', () => { this.touchState.p1Right = false; });
+        this.p1RightBtn.on('pointerout', () => { this.touchState.p1Right = false; });
+
+        // P2 touch handlers
+        this.p2LeftBtn.on('pointerdown', () => { this.touchState.p2Left = true; });
+        this.p2LeftBtn.on('pointerup', () => { this.touchState.p2Left = false; });
+        this.p2LeftBtn.on('pointerout', () => { this.touchState.p2Left = false; });
+        this.p2RightBtn.on('pointerdown', () => { this.touchState.p2Right = true; });
+        this.p2RightBtn.on('pointerup', () => { this.touchState.p2Right = false; });
+        this.p2RightBtn.on('pointerout', () => { this.touchState.p2Right = false; });
+      }
+
+      spawnItem() {
+        if (this.gameOver) return;
+
+        // Random x within each half
+        const isTrash = Phaser.Math.Between(1, 100) <= 65; // 65% trash
+        const isAnvil = Phaser.Math.Between(1, 100) <= 10; // 10% anvil
+
+        let itemDef, x, y;
+
+        if (isAnvil) {
+          itemDef = this.anvilItem;
+          x = Phaser.Math.Between(20, GAME_WIDTH - 20);
+          y = -40;
+        } else if (isTrash) {
+          itemDef = Phaser.Utils.Array.GetRandom(this.trashItems);
+          x = Phaser.Math.Between(20, GAME_WIDTH - 20);
+          y = -40;
+        } else {
+          itemDef = Phaser.Utils.Array.GetRandom(this.nonTrashItems);
+          x = Phaser.Math.Between(20, GAME_WIDTH - 20);
+          y = -40;
+        }
+
+        const sprite = this.add.sprite(x, y, itemDef.key).setDepth(5);
+        this.fallingItems.push({
+          sprite: sprite,
+          def: itemDef,
+          isTrash: isTrash && !isAnvil,
+          isAnvil: isAnvil,
+          speed: isAnvil ? 180 : Phaser.Math.Between(120, 220),
+          vx: isAnvil ? 0 : Phaser.Math.Between(-20, 20)
+        });
+      }
+
+      update(time, delta) {
+        if (this.gameOver) return;
+        const dt = delta / 1000;
+
+        // ---- PLAYER 1 MOVEMENT (WASD / touch) ----
+        if (!this.p1.stunned) {
+          let moveX = 0;
+          if (this.keys.a.isDown || this.touchState.p1Left) moveX -= 1;
+          if (this.keys.d.isDown || this.touchState.p1Right) moveX += 1;
+          this.p1.vx = moveX * 250;
+          if (moveX !== 0) this.p1.facing = moveX;
+        } else {
+          this.p1.vx = 0;
+          this.p1.stunTimer -= delta;
+          if (this.p1.stunTimer <= 0) {
+            this.p1.stunned = false;
+            this.p1StunText.setVisible(false);
+            this.p1Sprite.setTint(0xffffff);
+          }
+        }
+
+        // ---- PLAYER 2 MOVEMENT (arrow keys / touch, or AI) ----
+        if (this.mode === '2p') {
+          if (!this.p2.stunned) {
+            let moveX = 0;
+            if (this.keys.left.isDown || this.touchState.p2Left) moveX -= 1;
+            if (this.keys.right.isDown || this.touchState.p2Right) moveX += 1;
+            this.p2.vx = moveX * 250;
+            if (moveX !== 0) this.p2.facing = moveX;
+          } else {
+            this.p2.vx = 0;
+            this.p2.stunTimer -= delta;
+            if (this.p2.stunTimer <= 0) {
+              this.p2.stunned = false;
+              this.p2StunText.setVisible(false);
+              this.p2Sprite.setTint(0xffffff);
+            }
+          }
+        } else {
+          // ---- AI ----
+          if (!this.p2.stunned) {
+            // Simple AI: find nearest trash item, move towards it. Avoid non-trash.
+            let targetX = this.p2.x;
+            let bestDist = Infinity;
+            let bestItem = null;
+
+            for (let item of this.fallingItems) {
+              if (item.isTrash && !item.isAnvil) {
+                const dist = Math.abs(item.sprite.x - this.p2.x) + Math.abs(item.sprite.y - this.p2.y) * 0.5;
+                if (dist < bestDist) {
+                  bestDist = dist;
+                  bestItem = item;
+                }
+              }
+            }
+
+            if (bestItem) {
+              targetX = bestItem.sprite.x;
+            } else {
+              // If no trash, move randomly to center
+              targetX = 720 + Math.sin(time * 0.001) * 100;
+            }
+
+            // Move towards target
+            const dx = targetX - this.p2.x;
+            if (Math.abs(dx) > 5) {
+              this.p2.vx = Math.sign(dx) * 200;
+              this.p2.facing = Math.sign(dx);
+            } else {
+              this.p2.vx = 0;
+            }
+          } else {
+            this.p2.vx = 0;
+            this.p2.stunTimer -= delta;
+            if (this.p2.stunTimer <= 0) {
+              this.p2.stunned = false;
+              this.p2StunText.setVisible(false);
+              this.p2Sprite.setTint(0xffffff);
+            }
+          }
+        }
+
+        // Apply movement
+        this.p1.x += this.p1.vx * dt;
+        this.p2.x += this.p2.vx * dt;
+
+        // Boundaries (left half: 20 to 460, right half: 500 to 940)
+        this.p1.x = Phaser.Math.Clamp(this.p1.x, 30, 450);
+        this.p2.x = Phaser.Math.Clamp(this.p2.x, 510, 930);
+
+        // Update sprite positions
+        this.p1Sprite.setPosition(this.p1.x, this.p1.y);
+        this.p1Sprite.setFlipX(this.p1.facing < 0);
+        this.p1Bin.setPosition(this.p1.x, this.p1.y - 30);
+
+        this.p2Sprite.setPosition(this.p2.x, this.p2.y);
+        this.p2Sprite.setFlipX(this.p2.facing < 0);
+        this.p2Bin.setPosition(this.p2.x, this.p2.y - 30);
+
+        // Simple idle animation (bobbing)
+        this.p1.animTimer += delta;
+        this.p2.animTimer += delta;
+        const bob1 = Math.sin(this.p1.animTimer * 0.01) * 2;
+        const bob2 = Math.sin(this.p2.animTimer * 0.01) * 2;
+        this.p1Sprite.y = this.p1.y + bob1;
+        this.p2Sprite.y = this.p2.y + bob2;
+        this.p1Bin.y = this.p1.y - 30 + bob1;
+        this.p2Bin.y = this.p2.y - 30 + bob2;
+
+        // ---- UPDATE FALLING ITEMS ----
+        for (let i = this.fallingItems.length - 1; i >= 0; i--) {
+          const item = this.fallingItems[i];
+          item.sprite.y += item.speed * dt;
+          item.sprite.x += item.vx * dt;
+          item.sprite.rotation += 0.02;
+
+          // Check collision with players (using distance)
+          const p1Dist = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p1.x, this.p1.y - 20);
+          const p2Dist = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p2.x, this.p2.y - 20);
+
+          let caught = false;
+
+          if (p1Dist < 40 && item.sprite.y < this.p1.y + 20 && item.sprite.y > this.p1.y - 60) {
+            this.handleCatch(item, 'p1');
+            caught = true;
+          } else if (p2Dist < 40 && item.sprite.y < this.p2.y + 20 && item.sprite.y > this.p2.y - 60) {
+            this.handleCatch(item, 'p2');
+            caught = true;
+          }
+
+          if (caught) {
+            item.sprite.destroy();
+            this.fallingItems.splice(i, 1);
+            continue;
+          }
+
+          // Remove if off screen
+          if (item.sprite.y > GAME_HEIGHT + 50) {
+            item.sprite.destroy();
+            this.fallingItems.splice(i, 1);
+          }
+        }
+      }
+
+      handleCatch(item, player) {
+        const isP1 = player === 'p1';
+        const scoreText = isP1 ? this.p1ScoreText : this.p2ScoreText;
+        let points = item.def.points;
+
+        if (item.isAnvil) {
+          // Anvil: deduct random points, stun
+          points = -Phaser.Math.Between(20, 50);
+          if (isP1) {
+            this.p1.score += points;
+            this.p1.stunned = true;
+            this.p1.stunTimer = 2000;
+            this.p1StunText.setVisible(true);
+            this.p1Sprite.setTint(0xff4444);
+          } else {
+            this.p2.score += points;
+            this.p2.stunned = true;
+            this.p2.stunTimer = 2000;
+            this.p2StunText.setVisible(true);
+            this.p2Sprite.setTint(0xff4444);
+          }
+        } else if (item.isTrash) {
+          if (isP1) this.p1.score += points;
+          else this.p2.score += points;
+        } else {
+          // Non-trash: deduct points
+          if (isP1) this.p1.score += points;
+          else this.p2.score += points;
+        }
+
+        // Update score display
+        this.p1ScoreText.setText('P1: ' + this.p1.score);
+        this.p2ScoreText.setText('P2: ' + this.p2.score);
+
+        // Visual feedback
+        const flashText = this.add.text(isP1 ? this.p1.x : this.p2.x, (isP1 ? this.p1.y : this.p2.y) - 60,
+          (points > 0 ? '+' : '') + points, {
+            fontFamily: 'Arial Black', fontSize: '24px',
+            color: points > 0 ? '#44ff44' : '#ff4444',
+            stroke: '#000', strokeThickness: 3
+          }).setOrigin(0.5).setDepth(15);
+
+        this.tweens.add({
+          targets: flashText,
+          y: flashText.y - 60,
+          alpha: 0,
+          duration: 800,
+          onComplete: () => flashText.destroy()
+        });
+
+        // Particle effect
+        const particles = this.add.particles(0, 0, 'spark', {
+          speed: 100,
+          lifespan: 400,
+          quantity: 5,
+          scale: { start: 1, end: 0 },
+          x: isP1 ? this.p1.x : this.p2.x,
+          y: isP1 ? this.p1.y - 20 : this.p2.y - 20
+        });
+        this.time.delayedCall(400, () => particles.destroy());
+      }
+    }
+
+    // ---------- CONFIG & LAUNCH ----------
+    const config = {
+      type: Phaser.AUTO,
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+      parent: 'game-container',
+      backgroundColor: '#1a2e1a',
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: GAME_WIDTH,
+        height: GAME_HEIGHT
+      },
+      scene: [BootScene, MenuScene, GameScene],
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { y: 0 }, debug: false }
+      }
+    };
+
+    new Phaser.Game(config);
+  </script>
 </body>
 </html>
