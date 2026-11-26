@@ -8,8 +8,8 @@
     * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
     html, body {
       width:100%; height:100%; overflow:hidden;
-      background:#0d1a0d;
-      font-family:'Arial Black','Impact',sans-serif;
+      background:#0a0f0a;
+      font-family: 'Trebuchet MS', 'Arial', sans-serif;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
@@ -23,12 +23,21 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script>
     // ============================================================
-    //  ENVIRONMENT BATTLE v2
-    //  - Glowing trash (red) and normal items (green)
-    //  - Health system, weapons, multi-touch
+    //  ENVIRONMENT BATTLE v3
+    //  - 3 zones: P1 collect | BATTLEGROUND | P2 collect
+    //  - Shop with weapons, health potions
+    //  - Clean UI, glowing items, multi-touch
     // ============================================================
-    const GAME_WIDTH = 960;
+    const GAME_WIDTH = 1200;
     const GAME_HEIGHT = 720;
+
+    // Zone boundaries
+    const ZONE = {
+      p1:   { x: 0,    w: 350, cx: 175 },
+      mid:  { x: 350,  w: 500, cx: 600 },
+      p2:   { x: 850,  w: 350, cx: 1025 }
+    };
+    const GROUND_Y = 600;
 
     // ---------- BOOT ----------
     class BootScene extends Phaser.Scene {
@@ -39,51 +48,63 @@
       }
       createTextures() {
         const g = this.add.graphics(); g.setVisible(false);
-        const tex = (key, w, h) => g.generateTexture(key, w, h);
+        const tex = (k,w,h) => g.generateTexture(k,w,h);
 
-        // ---- TRASH (will have red glow) ----
-        g.clear(); g.fillStyle(0xbbbbbb); g.fillRect(4,8,20,28); g.fillStyle(0xcc3333); g.fillRect(4,8,20,8); g.fillStyle(0x888888); g.fillRect(6,14,16,4); tex('trashCan',28,40);
-        g.clear(); g.fillStyle(0x44aa44); g.fillRect(8,6,12,30); g.fillStyle(0x66cc66); g.fillRect(6,2,16,8); tex('trashBottle',28,40);
-        g.clear(); g.fillStyle(0x333333); g.fillCircle(14,20,12); g.fillStyle(0x555555); g.fillCircle(10,16,4); tex('trashBag',28,40);
-        g.clear(); g.fillStyle(0xeeeeee); g.fillRect(2,10,24,20); g.fillStyle(0xcccccc); g.fillRect(4,14,20,4); tex('trashPaper',28,40);
-        g.clear(); g.fillStyle(0xaa8866); g.fillRect(2,8,24,24); g.fillStyle(0x886644); g.fillRect(2,8,24,4); tex('trashBox',28,40);
+        // ---- TRASH (red glow) ----
+        g.clear(); g.fillStyle(0xdddddd); g.fillRoundedRect(4,8,20,28,4); g.fillStyle(0xcc3333); g.fillRoundedRect(4,8,20,8,4); g.fillStyle(0x999999); g.fillRect(6,16,16,3); tex('trashCan',28,40);
+        g.clear(); g.fillStyle(0x44aa44); g.fillRoundedRect(8,6,12,30,4); g.fillStyle(0x66cc66); g.fillRect(6,2,16,8); tex('trashBottle',28,40);
+        g.clear(); g.fillStyle(0x444444); g.fillCircle(14,22,12); g.fillStyle(0x666666); g.fillCircle(10,18,4); tex('trashBag',28,40);
+        g.clear(); g.fillStyle(0xf0f0f0); g.fillRect(2,10,24,20); g.fillStyle(0xcccccc); g.fillRect(4,14,20,3); g.fillRect(4,20,20,3); tex('trashPaper',28,40);
+        g.clear(); g.fillStyle(0xbb9977); g.fillRoundedRect(2,8,24,24,3); g.fillStyle(0x997755); g.fillRect(2,8,24,4); tex('trashBox',28,40);
 
-        // ---- NORMAL ITEMS (will have green glow) ----
-        g.clear(); g.fillStyle(0xee3333); g.fillCircle(14,20,12); g.fillStyle(0x44aa44); g.fillRect(12,6,4,8); tex('apple',28,40);
-        g.clear(); g.fillStyle(0xff8800); g.fillCircle(14,20,12); g.fillStyle(0xcc6600); g.fillRect(12,6,4,8); tex('orange',28,40);
-        g.clear(); g.fillStyle(0x4488ff); g.fillRect(6,10,16,22); g.fillStyle(0x2266cc); g.fillRect(4,8,20,6); tex('cup',28,40);
+        // ---- NORMAL (green glow) ----
+        g.clear(); g.fillStyle(0xee3333); g.fillCircle(14,22,12); g.fillStyle(0x44aa44); g.fillRect(12,6,4,8); tex('apple',28,40);
+        g.clear(); g.fillStyle(0xff9900); g.fillCircle(14,22,12); g.fillStyle(0xcc6600); g.fillRect(12,8,4,6); tex('orange',28,40);
+        g.clear(); g.fillStyle(0x4488ff); g.fillRoundedRect(7,10,14,22,3); g.fillStyle(0x2266cc); g.fillRect(5,8,18,5); tex('cup',28,40);
 
         // ---- ANVIL ----
-        g.clear(); g.fillStyle(0x444444); g.fillRect(0,10,48,30); g.fillStyle(0x666666); g.fillRect(4,14,40,12); g.fillStyle(0x222222); g.fillRect(12,6,24,6); tex('anvil',48,40);
+        g.clear(); g.fillStyle(0x555555); g.fillRect(2,10,44,28); g.fillStyle(0x777777); g.fillRect(6,14,36,10); g.fillStyle(0x333333); g.fillRect(12,6,24,6); tex('anvil',48,40);
 
         // ---- SKINS ----
-        g.clear(); g.fillStyle(0x44aa44); g.fillRect(8,10,20,24); g.fillStyle(0xffccaa); g.fillCircle(18,8,8); g.fillStyle(0x222222); g.fillRect(10,20,4,8); g.fillRect(22,20,4,8); tex('player1',36,44);
-        g.clear(); g.fillStyle(0x222222); g.fillRect(8,10,20,24); g.fillStyle(0xffccaa); g.fillCircle(18,8,8); g.fillStyle(0x111111); g.fillRect(6,0,24,6); g.fillStyle(0x222222); g.fillRect(10,20,4,8); g.fillRect(22,20,4,8); tex('playerMJ',36,44);
-        g.clear(); g.fillStyle(0x4488ff); g.fillRect(8,10,20,24); g.fillStyle(0xffddcc); g.fillCircle(18,8,8); g.fillStyle(0xffffff); g.fillRect(10,20,4,8); g.fillRect(22,20,4,8); tex('playerVerity',36,44);
-        g.clear(); g.fillStyle(0xcc3333); g.fillRect(8,10,20,24); g.fillStyle(0xffccaa); g.fillCircle(18,8,8); g.fillStyle(0x222222); g.fillRect(10,20,4,8); g.fillRect(22,20,4,8); tex('playerFalsity',36,44);
-        g.clear(); g.fillStyle(0x8B5A2B); g.fillRect(8,10,20,24); g.fillStyle(0xC68642); g.fillCircle(18,8,8); g.fillStyle(0x5C3317); g.fillRect(10,20,4,8); g.fillRect(22,20,4,8); tex('playerMonkey',36,44);
+        const drawBody = (bodyColor) => {
+          g.clear();
+          g.fillStyle(bodyColor); g.fillRoundedRect(8,12,20,26,4);
+          g.fillStyle(0xffccaa); g.fillCircle(18,8,9);
+          g.fillStyle(0x222222); g.fillRect(10,22,5,10); g.fillRect(21,22,5,10);
+          g.fillStyle(0xffccaa); g.fillRect(4,16,5,12); g.fillRect(27,16,5,12);
+        };
+        drawBody(0x44aa44); tex('player1',36,46);
+        drawBody(0x222222); g.fillStyle(0x111111); g.fillRect(6,0,24,6); tex('playerMJ',36,46);
+        drawBody(0x4488ff); g.fillStyle(0xffffff); g.fillRect(12,2,12,4); tex('playerVerity',36,46);
+        drawBody(0xcc3333); g.fillStyle(0x222222); g.fillRect(6,0,24,5); tex('playerFalsity',36,46);
+        drawBody(0x8B5A2B); g.fillStyle(0xC68642); g.fillCircle(18,8,9); tex('playerMonkey',36,46);
 
         // ---- BIN ----
-        g.clear(); g.fillStyle(0x888888); g.fillRect(0,0,40,30); g.fillStyle(0xaaaaaa); g.fillRect(4,4,32,22); g.fillStyle(0x666666); g.fillRect(0,0,40,4); tex('bin',40,30);
+        g.clear(); g.fillStyle(0x777777); g.fillRoundedRect(0,4,40,28,6); g.fillStyle(0x999999); g.fillRoundedRect(4,8,32,20,4); g.fillStyle(0x555555); g.fillRect(0,4,40,5); tex('bin',40,34);
 
         // ---- MAPS ----
-        g.clear(); g.fillStyle(0x3a5f3a); g.fillRect(0,0,480,720); g.fillStyle(0x4a7a4a); for(let i=0;i<20;i++){ g.fillCircle(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(10,30)); } tex('mapPark',480,720);
-        g.clear(); g.fillStyle(0x2a2a3a); g.fillRect(0,0,480,720); g.fillStyle(0x4a4a6a); for(let i=0;i<15;i++){ g.fillRect(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(20,50), Phaser.Math.Between(10,20)); } tex('mapCity',480,720);
-        g.clear(); g.fillStyle(0xeedd99); g.fillRect(0,0,480,720); g.fillStyle(0x4488cc); for(let i=0;i<8;i++){ g.fillEllipse(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(30,80), Phaser.Math.Between(10,30)); } tex('mapBeach',480,720);
-        g.clear(); g.fillStyle(0xccddee); g.fillRect(0,0,480,720); g.fillStyle(0xffffff); for(let i=0;i<30;i++){ g.fillCircle(Phaser.Math.Between(0,480), Phaser.Math.Between(0,720), Phaser.Math.Between(4,12)); } tex('mapSnow',480,720);
+        g.clear(); g.fillStyle(0x3a5f3a); g.fillRect(0,0,1200,720); g.fillStyle(0x4a7a4a); for(let i=0;i<40;i++){ g.fillCircle(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,720), Phaser.Math.Between(15,40)); } g.fillStyle(0x2a4a2a); g.fillRect(0,GROUND_Y,1200,120); tex('mapPark',1200,720);
+        g.clear(); g.fillStyle(0x2a2a3a); g.fillRect(0,0,1200,720); g.fillStyle(0x3a3a5a); for(let i=0;i<25;i++){ g.fillRect(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,GROUND_Y), Phaser.Math.Between(30,70), Phaser.Math.Between(40,120)); } g.fillStyle(0x1a1a2a); g.fillRect(0,GROUND_Y,1200,120); tex('mapCity',1200,720);
+        g.clear(); g.fillStyle(0xeedd99); g.fillRect(0,0,1200,720); g.fillStyle(0x4488cc); for(let i=0;i<12;i++){ g.fillEllipse(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,GROUND_Y), Phaser.Math.Between(50,120), Phaser.Math.Between(15,40)); } g.fillStyle(0xdcc880); g.fillRect(0,GROUND_Y,1200,120); tex('mapBeach',1200,720);
+        g.clear(); g.fillStyle(0xccddee); g.fillRect(0,0,1200,720); g.fillStyle(0xffffff); for(let i=0;i<50;i++){ g.fillCircle(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,720), Phaser.Math.Between(5,15)); } g.fillStyle(0xbbccdd); g.fillRect(0,GROUND_Y,1200,120); tex('mapSnow',1200,720);
 
-        // ---- HUD ----
-        g.clear(); g.fillStyle(0x000000, 0.7); g.fillRect(0,0,480,100); tex('hudBg',480,100);
-
-        // ---- HEALTH BAR ----
-        g.clear(); g.fillStyle(0x44ff44); g.fillRect(0,0,200,16); g.generateTexture('healthFill',200,16);
-        g.clear(); g.fillStyle(0x222222); g.fillRect(0,0,200,16); g.generateTexture('healthBg',200,16);
-        g.clear(); g.fillStyle(0xffffff); g.fillRect(0,0,200,16); g.generateTexture('healthWhite',200,16);
+        // ---- UI ----
+        g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,350,120,0); tex('hudP1',350,120);
+        g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,500,120,0); tex('hudMid',500,120);
+        g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,350,120,0); tex('hudP2',350,120);
 
         // ---- WEAPON ICONS ----
-        g.clear(); g.fillStyle(0xaa6633); g.fillRect(4,0,6,20); g.fillStyle(0xcc8844); g.fillRect(0,18,14,6); tex('weaponStick',20,30);
-        g.clear(); g.fillStyle(0x888888); g.fillRect(2,4,16,16); g.fillStyle(0xaaaaaa); g.fillRect(6,8,8,8); tex('weaponRock',20,30);
-        g.clear(); g.fillStyle(0x44aaff); g.fillRect(6,2,8,24); g.fillStyle(0x66ccff); g.fillCircle(10,26,6); tex('weaponWater',20,30);
+        g.clear(); g.fillStyle(0xaa6633); g.fillRect(7,2,6,22); g.fillStyle(0xcc8844); g.fillRect(2,20,16,6); tex('iconStick',20,30);
+        g.clear(); g.fillStyle(0x888888); g.fillCircle(10,15,9); g.fillStyle(0xaaaaaa); g.fillCircle(7,12,4); tex('iconRock',20,30);
+        g.clear(); g.fillStyle(0x44aaff); g.fillRect(7,2,6,22); g.fillStyle(0x66ccff); g.fillCircle(10,24,6); tex('iconGun',20,30);
+        g.clear(); g.fillStyle(0xcccccc); g.fillRect(8,0,4,26); g.fillStyle(0xffdd44); g.fillRect(2,26,16,4); tex('iconKatana',20,30);
+        g.clear(); g.fillStyle(0x44ff44); g.fillCircle(10,15,10); g.fillStyle(0xffffff); g.fillRect(6,14,8,2); g.fillRect(9,11,2,8); tex('iconPotion',20,30);
+
+        // ---- AMMO ----
+        g.clear(); g.fillStyle(0xffdd44); g.fillCircle(3,3,3); tex('bullet',6,6);
+
+        // ---- SLASH ----
+        g.clear(); g.fillStyle(0xffffff, 0.9); g.beginPath(); g.moveTo(0,15); g.lineTo(40,0); g.lineTo(40,8); g.lineTo(10,18); g.closePath(); g.fillPath(); tex('slash',42,20);
 
         g.destroy();
       }
@@ -93,60 +114,79 @@
     class MenuScene extends Phaser.Scene {
       constructor() { super('Menu'); }
       create() {
-        this.add.text(GAME_WIDTH/2, 60, '🌍 ENVIRONMENT BATTLE', {
-          fontFamily: 'Arial Black', fontSize: '42px', color: '#ffffff', stroke: '#2a6a2a', strokeThickness: 6
+        // Background
+        this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_WIDTH, GAME_HEIGHT, 0x0a1a0a);
+        this.add.rectangle(GAME_WIDTH/2, 0, GAME_WIDTH, 200, 0x1a3a1a).setOrigin(0.5, 0);
+
+        this.add.text(GAME_WIDTH/2, 70, 'ENVIRONMENT BATTLE', {
+          fontFamily: 'Trebuchet MS', fontSize: '52px', fontStyle: 'bold', color: '#ffffff',
+          stroke: '#2a6a2a', strokeThickness: 8, shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 8, fill: true }
         }).setOrigin(0.5);
-        this.add.text(GAME_WIDTH/2, 120, 'Catch trash, avoid hazards, battle!', {
-          fontFamily: 'Arial', fontSize: '18px', color: '#cccccc'
+        this.add.text(GAME_WIDTH/2, 130, 'Collect trash · Buy weapons · Destroy your rival', {
+          fontFamily: 'Trebuchet MS', fontSize: '18px', color: '#88cc88'
         }).setOrigin(0.5);
 
-        const btnStyle = { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff', backgroundColor: '#2a6a2a', padding: { x: 20, y: 10 } };
+        const btnStyle = (color) => ({
+          fontFamily: 'Trebuchet MS', fontSize: '24px', fontStyle: 'bold', color: '#fff',
+          backgroundColor: color, padding: { x: 40, y: 14 }
+        });
 
-        const twoP = this.add.text(GAME_WIDTH/2, 220, '👥 2 PLAYERS (local)', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        const twoP = this.add.text(GAME_WIDTH/2 - 160, 260, '2 PLAYERS', btnStyle('#2a6a2a')).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        twoP.on('pointerover', () => twoP.setStyle({ backgroundColor: '#3a8a3a' }));
+        twoP.on('pointerout', () => twoP.setStyle({ backgroundColor: '#2a6a2a' }));
         twoP.on('pointerdown', () => this.startGame('2p'));
 
-        const vsAI = this.add.text(GAME_WIDTH/2, 300, '🤖 VS AI', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        const vsAI = this.add.text(GAME_WIDTH/2 + 160, 260, 'VS AI', btnStyle('#1a5a7a')).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        vsAI.on('pointerover', () => vsAI.setStyle({ backgroundColor: '#2a7a9a' }));
+        vsAI.on('pointerout', () => vsAI.setStyle({ backgroundColor: '#1a5a7a' }));
         vsAI.on('pointerdown', () => this.showAISelect());
 
         // Map select
-        this.add.text(GAME_WIDTH/2, 420, 'SELECT MAP', { fontFamily: 'Arial Black', fontSize: '22px', color: '#fff' }).setOrigin(0.5);
-        this.mapNames = ['🌳 Park', '🏙️ City', '🏖️ Beach', '❄️ Snow'];
+        this.add.text(GAME_WIDTH/2, 360, 'MAP', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#88aa88' }).setOrigin(0.5);
+        this.mapNames = ['Park', 'City', 'Beach', 'Snow'];
+        this.mapColors = [0x3a5f3a, 0x2a2a3a, 0xeedd99, 0xccddee];
         this.selectedMap = 0;
         this.mapButtons = [];
         for (let i = 0; i < 4; i++) {
-          const btn = this.add.text(GAME_WIDTH/2 - 180 + i * 120, 480, this.mapNames[i], {
-            fontFamily: 'Arial', fontSize: '16px', color: '#fff',
-            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 10, y: 8 }
-          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-          btn.on('pointerdown', () => {
+          const x = GAME_WIDTH/2 - 240 + i * 160;
+          const bg = this.add.rectangle(x, 420, 140, 70, this.mapColors[i]).setStrokeStyle(3, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
+          const label = this.add.text(x, 420, this.mapNames[i], {
+            fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold',
+            color: i === 2 ? '#333' : '#fff'
+          }).setOrigin(0.5);
+          bg.on('pointerdown', () => {
             this.selectedMap = i;
-            this.mapButtons.forEach((b, j) => b.setStyle({ backgroundColor: j === i ? '#4a8a4a' : '#2a4a2a' }));
+            this.mapButtons.forEach((b, j) => b.bg.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
           });
-          this.mapButtons.push(btn);
+          this.mapButtons.push({ bg, label });
         }
 
         // Skin select
-        this.add.text(GAME_WIDTH/2, 560, 'PLAYER 1 SKIN', { fontFamily: 'Arial Black', fontSize: '16px', color: '#fff' }).setOrigin(0.5);
+        this.add.text(GAME_WIDTH/2, 500, 'YOUR SKIN', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#88aa88' }).setOrigin(0.5);
         this.skinKeys = ['player1', 'playerMJ', 'playerVerity', 'playerFalsity', 'playerMonkey'];
         this.skinNames = ['Green', 'MJ', 'Verity', 'Falsity', 'Monkey'];
         this.p1Skin = 0;
         this.skinButtons = [];
         for (let i = 0; i < 5; i++) {
-          const btn = this.add.text(GAME_WIDTH/2 - 200 + i * 100, 600, this.skinNames[i], {
-            fontFamily: 'Arial', fontSize: '14px', color: '#fff',
-            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 8, y: 6 }
-          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-          btn.on('pointerdown', () => {
+          const x = GAME_WIDTH/2 - 240 + i * 120;
+          const bg = this.add.rectangle(x, 560, 100, 60, 0x1a2a1a).setStrokeStyle(3, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
+          this.add.sprite(x - 20, 560, this.skinKeys[i]).setDisplaySize(30, 38);
+          const label = this.add.text(x + 18, 560, this.skinNames[i], {
+            fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#fff'
+          }).setOrigin(0.5);
+          bg.on('pointerdown', () => {
             this.p1Skin = i;
-            this.skinButtons.forEach((b, j) => b.setStyle({ backgroundColor: j === i ? '#4a8a4a' : '#2a4a2a' }));
+            this.skinButtons.forEach((b, j) => b.bg.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
           });
-          this.skinButtons.push(btn);
+          this.skinButtons.push({ bg, label });
         }
 
         // AI panel
         this.aiPanel = this.add.container(0, 0).setVisible(false).setDepth(100);
-        const aiBg = this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, 500, 400, 0x000000, 0.92).setStrokeStyle(2, 0x44aa44);
-        const aiTitle = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 150, 'CHOOSE AI OPPONENT', { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+        const aiBg = this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, 560, 460, 0x0a1a0a, 0.96).setStrokeStyle(3, 0x44aa44);
+        const aiTitle = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 180, 'CHOOSE AI OPPONENT', {
+          fontFamily: 'Trebuchet MS', fontSize: '28px', fontStyle: 'bold', color: '#fff'
+        }).setOrigin(0.5);
         this.aiPanel.add([aiBg, aiTitle]);
 
         const aiOptions = ['Michael Jackson', 'Verity', 'Falsity', 'Monkey'];
@@ -154,20 +194,23 @@
         this.selectedAI = 0;
         this.aiButtons = [];
         for (let i = 0; i < 4; i++) {
-          const btn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 80 + i * 55, aiOptions[i], {
-            fontFamily: 'Arial Black', fontSize: '20px', color: '#fff',
-            backgroundColor: i === 0 ? '#4a8a4a' : '#2a4a2a', padding: { x: 20, y: 8 }
-          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-          btn.on('pointerdown', () => {
+          const y = GAME_HEIGHT/2 - 110 + i * 70;
+          const bg = this.add.rectangle(GAME_WIDTH/2, y, 400, 56, 0x1a2a1a).setStrokeStyle(2, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
+          this.add.sprite(GAME_WIDTH/2 - 150, y, this.aiSkinKeys[i]).setDisplaySize(36, 46);
+          const label = this.add.text(GAME_WIDTH/2 + 10, y, aiOptions[i], {
+            fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold', color: '#fff'
+          }).setOrigin(0.5);
+          bg.on('pointerdown', () => {
             this.selectedAI = i;
-            this.aiButtons.forEach((b, j) => b.setStyle({ backgroundColor: j === i ? '#4a8a4a' : '#2a4a2a' }));
+            this.aiButtons.forEach((b, j) => b.bg.setStrokeStyle(2, j === i ? 0xffdd44 : 0x444444));
           });
-          this.aiButtons.push(btn);
-          this.aiPanel.add(btn);
+          this.aiButtons.push({ bg, label });
+          this.aiPanel.add([bg, label]);
         }
 
-        const startAIBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 145, 'START BATTLE', {
-          fontFamily: 'Arial Black', fontSize: '22px', color: '#fff', backgroundColor: '#2a6a2a', padding: { x: 25, y: 10 }
+        const startAIBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 170, 'START BATTLE', {
+          fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold', color: '#fff',
+          backgroundColor: '#2a6a2a', padding: { x: 30, y: 10 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         startAIBtn.on('pointerdown', () => {
           this.aiPanel.setVisible(false);
@@ -175,8 +218,8 @@
         });
         this.aiPanel.add(startAIBtn);
 
-        const backBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 205, 'CANCEL', {
-          fontFamily: 'Arial Black', fontSize: '16px', color: '#fff', backgroundColor: '#aa3333', padding: { x: 15, y: 6 }
+        const backBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 220, 'CANCEL', {
+          fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#ff8888'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         backBtn.on('pointerdown', () => this.aiPanel.setVisible(false));
         this.aiPanel.add(backBtn);
@@ -186,10 +229,9 @@
 
       startGame(mode, aiIndex = 0) {
         this.scene.start('Game', {
-          mode,
-          map: this.selectedMap,
+          mode, map: this.selectedMap,
           p1Skin: this.skinKeys[this.p1Skin],
-          p2Skin: mode === '2p' ? this.skinKeys[this.p1Skin] : this.aiSkinKeys[aiIndex],
+          p2Skin: mode === '2p' ? this.skinKeys[(this.p1Skin + 1) % 5] : this.aiSkinKeys[aiIndex],
           aiIndex
         });
       }
@@ -205,16 +247,14 @@
         this.p1Skin = data.p1Skin || 'player1';
         this.p2Skin = data.p2Skin || 'playerVerity';
         this.aiIndex = data.aiIndex || 0;
-
         this.mapKeys = ['mapPark', 'mapCity', 'mapBeach', 'mapSnow'];
 
-        // Item definitions
         this.trashItems = [
-          { key: 'trashCan', points: 10, name: 'Can' },
-          { key: 'trashBottle', points: 15, name: 'Bottle' },
-          { key: 'trashBag', points: 20, name: 'Bag' },
-          { key: 'trashPaper', points: 5, name: 'Paper' },
-          { key: 'trashBox', points: 25, name: 'Box' }
+          { key: 'trashCan', points: 10, scrap: 3 },
+          { key: 'trashBottle', points: 15, scrap: 4 },
+          { key: 'trashBag', points: 20, scrap: 5 },
+          { key: 'trashPaper', points: 5, scrap: 2 },
+          { key: 'trashBox', points: 25, scrap: 6 }
         ];
         this.nonTrashItems = [
           { key: 'apple', points: -10, name: 'Apple' },
@@ -223,69 +263,58 @@
         ];
         this.anvilItem = { key: 'anvil', points: -30, name: 'Anvil' };
 
-        // Player state
-        this.p1 = {
-          x: 200, y: 600, vx: 0, score: 0,
-          health: 100, maxHealth: 100,
-          stunned: false, stunTimer: 0,
-          facing: 1, animTimer: 0,
-          weaponLevel: 0, weaponName: 'None',
-          scrap: 0, // currency from trash
-          attackCooldown: 0
-        };
-        this.p2 = {
-          x: 760, y: 600, vx: 0, score: 0,
-          health: 100, maxHealth: 100,
-          stunned: false, stunTimer: 0,
-          facing: -1, animTimer: 0,
-          weaponLevel: 0, weaponName: 'None',
-          scrap: 0,
-          attackCooldown: 0
-        };
+        // Shop catalog
+        this.shopItems = [
+          { id: 'gun', name: 'Auto Gun', icon: 'iconGun', cost: 30, desc: 'Shoots bullets' },
+          { id: 'katana', name: 'Katana', icon: 'iconKatana', cost: 45, desc: 'Melee slash' },
+          { id: 'potion', name: 'Health Potion', icon: 'iconPotion', cost: 20, desc: '+40 HP' },
+          { id: 'armor', name: 'Armor', icon: 'iconStick', cost: 35, desc: 'Reduce dmg' }
+        ];
+
+        this.p1 = this.createPlayer(175, 'p1');
+        this.p2 = this.createPlayer(1025, 'p2');
 
         this.fallingItems = [];
+        this.bullets = [];
         this.gameOver = false;
+      }
 
-        // Weapon shop data
-        this.weaponShop = [
-          { name: 'Stick', cost: 15, damage: 8, icon: 'weaponStick' },
-          { name: 'Rock', cost: 30, damage: 15, icon: 'weaponRock' },
-          { name: 'Water Gun', cost: 50, damage: 22, icon: 'weaponWater' }
-        ];
+      createPlayer(x, side) {
+        return {
+          x, y: GROUND_Y, vx: 0,
+          side, score: 0, health: 100, maxHealth: 100,
+          stunned: false, stunTimer: 0,
+          facing: side === 'p1' ? 1 : -1,
+          animTimer: 0, scrap: 0,
+          weapon: null, // 'gun' | 'katana'
+          armor: 0,
+          attackCooldown: 0,
+          fireCooldown: 0,
+          inBattle: false
+        };
       }
 
       create() {
-        // Backgrounds
-        this.add.image(240, 360, this.mapKeys[this.mapIndex]).setDisplaySize(480, 720);
-        this.add.image(720, 360, this.mapKeys[this.mapIndex]).setDisplaySize(480, 720);
-        this.add.rectangle(480, 360, 4, 720, 0xffffff, 0.8);
+        // Map
+        this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, this.mapKeys[this.mapIndex]).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 
-        // HUD backgrounds
-        this.add.image(240, 50, 'hudBg').setDisplaySize(480, 100);
-        this.add.image(720, 50, 'hudBg').setDisplaySize(480, 100);
+        // Zone dividers
+        this.add.rectangle(ZONE.mid.x, GAME_HEIGHT/2, 3, GAME_HEIGHT, 0xffdd44, 0.5);
+        this.add.rectangle(ZONE.mid.x + ZONE.mid.w, GAME_HEIGHT/2, 3, GAME_HEIGHT, 0xffdd44, 0.5);
 
-        // Scores
-        this.p1ScoreText = this.add.text(240, 15, 'P1: 0', { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff' }).setOrigin(0.5);
-        this.p2ScoreText = this.add.text(720, 15, 'P2: 0', { fontFamily: 'Arial Black', fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+        // Zone labels
+        this.add.text(ZONE.p1.cx, 140, 'P1 COLLECT', { fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#88ff88' }).setOrigin(0.5);
+        this.add.text(ZONE.mid.cx, 140, '⚔ BATTLEGROUND ⚔', { fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold', color: '#ffdd44' }).setOrigin(0.5);
+        this.add.text(ZONE.p2.cx, 140, this.mode === 'ai' ? 'AI COLLECT' : 'P2 COLLECT', { fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#88bbff' }).setOrigin(0.5);
 
-        // Health bars
-        this.p1HealthBg = this.add.image(240, 45, 'healthBg').setDisplaySize(220, 16);
-        this.p1HealthFill = this.add.image(130, 45, 'healthWhite').setDisplaySize(220, 16).setOrigin(0, 0.5);
-        this.p1HealthFill.setTint(0x44ff44);
-        this.p1HealthText = this.add.text(240, 45, '100/100', { fontFamily: 'Arial', fontSize: '12px', color: '#fff' }).setOrigin(0.5);
+        // HUDs
+        this.add.image(ZONE.p1.cx, 0, 'hudP1').setOrigin(0.5, 0);
+        this.add.image(ZONE.mid.cx, 0, 'hudMid').setOrigin(0.5, 0);
+        this.add.image(ZONE.p2.cx, 0, 'hudP2').setOrigin(0.5, 0);
 
-        this.p2HealthBg = this.add.image(720, 45, 'healthBg').setDisplaySize(220, 16);
-        this.p2HealthFill = this.add.image(610, 45, 'healthWhite').setDisplaySize(220, 16).setOrigin(0, 0.5);
-        this.p2HealthFill.setTint(0x44ff44);
-        this.p2HealthText = this.add.text(720, 45, '100/100', { fontFamily: 'Arial', fontSize: '12px', color: '#fff' }).setOrigin(0.5);
-
-        // Scrap count
-        this.p1ScrapText = this.add.text(240, 70, 'Scrap: 0', { fontFamily: 'Arial', fontSize: '14px', color: '#ffdd44' }).setOrigin(0.5);
-        this.p2ScrapText = this.add.text(720, 70, 'Scrap: 0', { fontFamily: 'Arial', fontSize: '14px', color: '#ffdd44' }).setOrigin(0.5);
-
-        // Weapon display
-        this.p1WeaponText = this.add.text(240, 88, 'Weapon: None', { fontFamily: 'Arial', fontSize: '12px', color: '#aaa' }).setOrigin(0.5);
-        this.p2WeaponText = this.add.text(720, 88, 'Weapon: None', { fontFamily: 'Arial', fontSize: '12px', color: '#aaa' }).setOrigin(0.5);
+        this.buildHUD('p1', ZONE.p1.cx);
+        this.buildHUD('p2', ZONE.p2.cx);
+        this.buildMidHUD();
 
         // Player sprites
         this.p1Sprite = this.add.sprite(this.p1.x, this.p1.y, this.p1Skin).setDepth(10);
@@ -293,303 +322,443 @@
         this.p1Bin = this.add.sprite(this.p1.x, this.p1.y - 30, 'bin').setDepth(11);
         this.p2Bin = this.add.sprite(this.p2.x, this.p2.y - 30, 'bin').setDepth(11);
 
-        // Stun text
-        this.p1StunText = this.add.text(240, 160, 'STUNNED!', { fontFamily: 'Arial Black', fontSize: '28px', color: '#ff4444' }).setOrigin(0.5).setVisible(false).setDepth(20);
-        this.p2StunText = this.add.text(720, 160, 'STUNNED!', { fontFamily: 'Arial Black', fontSize: '28px', color: '#ff4444' }).setOrigin(0.5).setVisible(false).setDepth(20);
+        // Stun texts
+        this.p1StunText = this.add.text(this.p1.x, this.p1.y - 90, 'STUNNED', {
+          fontFamily: 'Trebuchet MS', fontSize: '20px', fontStyle: 'bold', color: '#ff4444',
+          stroke: '#000', strokeThickness: 3
+        }).setOrigin(0.5).setVisible(false).setDepth(20);
+        this.p2StunText = this.add.text(this.p2.x, this.p2.y - 90, 'STUNNED', {
+          fontFamily: 'Trebuchet MS', fontSize: '20px', fontStyle: 'bold', color: '#ff4444',
+          stroke: '#000', strokeThickness: 3
+        }).setOrigin(0.5).setVisible(false).setDepth(20);
 
-        // Input — use multi-touch for simultaneous buttons
-        this.input.addPointer(3);
+        // Input
+        this.input.addPointer(4);
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys({
-          a: Phaser.Input.Keyboard.KeyCodes.A,
-          d: Phaser.Input.Keyboard.KeyCodes.D,
-          w: Phaser.Input.Keyboard.KeyCodes.W,
-          s: Phaser.Input.Keyboard.KeyCodes.S,
-          left: Phaser.Input.Keyboard.KeyCodes.LEFT,
-          right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-          up: Phaser.Input.Keyboard.KeyCodes.UP,
-          down: Phaser.Input.Keyboard.KeyCodes.DOWN
+          a: Phaser.Input.Keyboard.KeyCodes.A, d: Phaser.Input.Keyboard.KeyCodes.D,
+          w: Phaser.Input.Keyboard.KeyCodes.W, s: Phaser.Input.Keyboard.KeyCodes.S,
+          left: Phaser.Input.Keyboard.KeyCodes.LEFT, right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+          up: Phaser.Input.Keyboard.KeyCodes.UP, down: Phaser.Input.Keyboard.KeyCodes.DOWN
         });
 
-        // Touch state
-        this.touchState = { p1Left:false, p1Right:false, p1Attack:false, p2Left:false, p2Right:false, p2Attack:false };
+        this.touchState = {
+          p1Left: false, p1Right: false, p1Up: false, p1Down: false, p1Action: false,
+          p2Left: false, p2Right: false, p2Up: false, p2Down: false, p2Action: false
+        };
 
-        const btnSize = 66;
-        const yPos = GAME_HEIGHT - 100;
-        const btnAlpha = 0.35;
+        this.buildTouchControls();
 
-        // P1 buttons
-        this.p1LeftBtn = this.add.rectangle(70, yPos, btnSize, btnSize, 0xffffff, btnAlpha).setInteractive().setDepth(30);
-        this.p1RightBtn = this.add.rectangle(160, yPos, btnSize, btnSize, 0xffffff, btnAlpha).setInteractive().setDepth(30);
-        this.p1AttackBtn = this.add.rectangle(115, yPos - 90, btnSize + 10, btnSize + 10, 0xff4444, 0.45).setInteractive().setDepth(30);
-        this.add.text(70, yPos, '◀', { fontSize:'32px', color:'#fff' }).setOrigin(0.5).setDepth(31);
-        this.add.text(160, yPos, '▶', { fontSize:'32px', color:'#fff' }).setOrigin(0.5).setDepth(31);
-        this.add.text(115, yPos - 90, '⚔️', { fontSize:'28px', color:'#fff' }).setOrigin(0.5).setDepth(31);
+        // Spawn timer — items fall in collection zones
+        this.time.addEvent({ delay: 700, callback: this.spawnItem, callbackScope: this, loop: true });
 
-        // P2 buttons
-        this.p2LeftBtn = this.add.rectangle(800, yPos, btnSize, btnSize, 0xffffff, btnAlpha).setInteractive().setDepth(30);
-        this.p2RightBtn = this.add.rectangle(890, yPos, btnSize, btnSize, 0xffffff, btnAlpha).setInteractive().setDepth(30);
-        this.p2AttackBtn = this.add.rectangle(845, yPos - 90, btnSize + 10, btnSize + 10, 0xff4444, 0.45).setInteractive().setDepth(30);
-        this.add.text(800, yPos, '◀', { fontSize:'32px', color:'#fff' }).setOrigin(0.5).setDepth(31);
-        this.add.text(890, yPos, '▶', { fontSize:'32px', color:'#fff' }).setOrigin(0.5).setDepth(31);
-        this.add.text(845, yPos - 90, '⚔️', { fontSize:'28px', color:'#fff' }).setOrigin(0.5).setDepth(31);
+        // Shop button
+        this.buildShopButton();
+      }
 
-        // Multi-touch handlers for P1
-        this.p1LeftBtn.on('pointerdown', () => this.touchState.p1Left = true);
-        this.p1LeftBtn.on('pointerup', () => this.touchState.p1Left = false);
-        this.p1LeftBtn.on('pointerout', () => this.touchState.p1Left = false);
-        this.p1RightBtn.on('pointerdown', () => this.touchState.p1Right = true);
-        this.p1RightBtn.on('pointerup', () => this.touchState.p1Right = false);
-        this.p1RightBtn.on('pointerout', () => this.touchState.p1Right = false);
-        this.p1AttackBtn.on('pointerdown', () => this.touchState.p1Attack = true);
-        this.p1AttackBtn.on('pointerup', () => this.touchState.p1Attack = false);
-        this.p1AttackBtn.on('pointerout', () => this.touchState.p1Attack = false);
+      buildHUD(side, cx) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        const name = side === 'p1' ? 'PLAYER 1' : (this.mode === 'ai' ? this.getAIName() : 'PLAYER 2');
+        const color = side === 'p1' ? '#88ff88' : '#88bbff';
 
-        // Multi-touch handlers for P2
-        this.p2LeftBtn.on('pointerdown', () => this.touchState.p2Left = true);
-        this.p2LeftBtn.on('pointerup', () => this.touchState.p2Left = false);
-        this.p2LeftBtn.on('pointerout', () => this.touchState.p2Left = false);
-        this.p2RightBtn.on('pointerdown', () => this.touchState.p2Right = true);
-        this.p2RightBtn.on('pointerup', () => this.touchState.p2Right = false);
-        this.p2RightBtn.on('pointerout', () => this.touchState.p2Right = false);
-        this.p2AttackBtn.on('pointerdown', () => this.touchState.p2Attack = true);
-        this.p2AttackBtn.on('pointerup', () => this.touchState.p2Attack = false);
-        this.p2AttackBtn.on('pointerout', () => this.touchState.p2Attack = false);
+        this[side + 'NameText'] = this.add.text(cx, 14, name, {
+          fontFamily: 'Trebuchet MS', fontSize: '15px', fontStyle: 'bold', color
+        }).setOrigin(0.5);
 
-        // Spawn timer
-        this.time.addEvent({ delay: 800, callback: this.spawnItem, callbackScope: this, loop: true });
+        this[side + 'ScoreText'] = this.add.text(cx, 36, '0 pts', {
+          fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold', color: '#fff'
+        }).setOrigin(0.5);
 
-        // Weapon shop timers (every 5 seconds, offer buy/upgrade)
-        this.time.addEvent({ delay: 5000, callback: () => this.offerWeapon('p1'), callbackScope: this });
+        // Health bar
+        this.add.rectangle(cx, 62, 200, 14, 0x333333).setStrokeStyle(1, 0x000000);
+        this[side + 'HealthFill'] = this.add.rectangle(cx - 100, 62, 200, 14, 0x44ff44).setOrigin(0, 0.5);
+        this[side + 'HealthText'] = this.add.text(cx, 62, '100', {
+          fontFamily: 'Trebuchet MS', fontSize: '11px', fontStyle: 'bold', color: '#fff'
+        }).setOrigin(0.5);
+
+        // Scrap
+        this[side + 'ScrapText'] = this.add.text(cx, 84, 'Scrap: 0', {
+          fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#ffdd44'
+        }).setOrigin(0.5);
+
+        // Weapon
+        this[side + 'WeaponText'] = this.add.text(cx, 104, 'No weapon', {
+          fontFamily: 'Trebuchet MS', fontSize: '12px', color: '#aaa'
+        }).setOrigin(0.5);
+      }
+
+      buildMidHUD() {
+        this.add.text(ZONE.mid.cx, 14, 'FIGHT!', {
+          fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold', color: '#ffdd44'
+        }).setOrigin(0.5);
+        this.midStatusText = this.add.text(ZONE.mid.cx, 44, 'Collect scrap in your zone, then buy weapons', {
+          fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#ccc'
+        }).setOrigin(0.5);
+      }
+
+      buildShopButton() {
+        // Shop button in the middle HUD
+        const shopBtn = this.add.rectangle(ZONE.mid.cx, 90, 160, 36, 0x2a5a2a).setStrokeStyle(2, 0x88ff88).setInteractive({ useHandCursor: true });
+        this.add.text(ZONE.mid.cx, 90, '🛒 SHOP (P1)', {
+          fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#fff'
+        }).setOrigin(0.5);
+        shopBtn.on('pointerdown', () => this.openShop('p1'));
+
+        // P2 shop button (for 2P mode)
         if (this.mode === '2p') {
-          this.time.addEvent({ delay: 5000, callback: () => this.offerWeapon('p2'), callbackScope: this });
+          const shopBtn2 = this.add.rectangle(ZONE.mid.cx, 130, 160, 36, 0x2a3a5a).setStrokeStyle(2, 0x88bbff).setInteractive({ useHandCursor: true });
+          this.add.text(ZONE.mid.cx, 130, '🛒 SHOP (P2)', {
+            fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#fff'
+          }).setOrigin(0.5);
+          shopBtn2.on('pointerdown', () => this.openShop('p2'));
+        } else {
+          // AI shops automatically
+          this.time.addEvent({ delay: 4000, callback: () => this.aiShop(), callbackScope: this, loop: true });
         }
+      }
+
+      openShop(side) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        const cx = side === 'p1' ? ZONE.p1.cx : ZONE.p2.cx;
+
+        // Shop overlay
+        const overlay = this.add.container(0, 0).setDepth(200);
+        const bg = this.add.rectangle(ZONE.mid.cx, GAME_HEIGHT/2, 460, 500, 0x0a1a0a, 0.96).setStrokeStyle(3, 0xffdd44);
+        const title = this.add.text(ZONE.mid.cx, GAME_HEIGHT/2 - 220, `SHOP — ${side === 'p1' ? 'P1' : 'P2'}`, {
+          fontFamily: 'Trebuchet MS', fontSize: '24px', fontStyle: 'bold', color: '#ffdd44'
+        }).setOrigin(0.5);
+        const scrapText = this.add.text(ZONE.mid.cx, GAME_HEIGHT/2 - 180, `Your Scrap: ${p.scrap}`, {
+          fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#fff'
+        }).setOrigin(0.5);
+        overlay.add([bg, title, scrapText]);
+
+        // Close button
+        const closeBtn = this.add.text(ZONE.mid.cx + 210, GAME_HEIGHT/2 - 230, '✕', {
+          fontFamily: 'Trebuchet MS', fontSize: '24px', color: '#ff8888'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        closeBtn.on('pointerdown', () => overlay.destroy());
+        overlay.add(closeBtn);
+
+        // Shop items
+        this.shopItems.forEach((item, i) => {
+          const y = GAME_HEIGHT/2 - 120 + i * 80;
+          const canAfford = p.scrap >= item.cost;
+          const bgColor = canAfford ? 0x1a3a1a : 0x2a1a1a;
+
+          const itemBg = this.add.rectangle(ZONE.mid.cx, y, 380, 68, bgColor).setStrokeStyle(2, canAfford ? 0x44aa44 : 0x664444);
+          const icon = this.add.sprite(ZONE.mid.cx - 150, y, item.icon).setDisplaySize(28, 40);
+          const nameText = this.add.text(ZONE.mid.cx - 110, y - 12, item.name, {
+            fontFamily: 'Trebuchet MS', fontSize: '16px', fontStyle: 'bold', color: '#fff'
+          });
+          const descText = this.add.text(ZONE.mid.cx - 110, y + 8, item.desc, {
+            fontFamily: 'Trebuchet MS', fontSize: '12px', color: '#aaa'
+          });
+          const costText = this.add.text(ZONE.mid.cx + 150, y, `${item.cost} scrap`, {
+            fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: canAfford ? '#ffdd44' : '#ff6666'
+          }).setOrigin(0.5);
+
+          overlay.add([itemBg, icon, nameText, descText, costText]);
+
+          if (canAfford) {
+            itemBg.setInteractive({ useHandCursor: true });
+            itemBg.on('pointerover', () => itemBg.setFillStyle(0x2a5a2a));
+            itemBg.on('pointerout', () => itemBg.setFillStyle(bgColor));
+            itemBg.on('pointerdown', () => {
+              this.buyItem(side, item);
+              overlay.destroy();
+            });
+          }
+        });
+      }
+
+      buyItem(side, item) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        if (p.scrap < item.cost) return;
+        p.scrap -= item.cost;
+
+        if (item.id === 'potion') {
+          p.health = Math.min(p.maxHealth, p.health + 40);
+          this.showFloatingText(p.x, p.y - 80, '+40 HP', '#44ff44');
+        } else if (item.id === 'armor') {
+          p.armor = Math.min(3, p.armor + 1);
+          this.showFloatingText(p.x, p.y - 80, `Armor Lv${p.armor}`, '#88bbff');
+        } else {
+          p.weapon = item.id;
+          this.showFloatingText(p.x, p.y - 80, `${item.name}!`, '#ffdd44');
+        }
+        this.updateHUD();
+      }
+
+      aiShop() {
+        if (this.gameOver) return;
+        const p = this.p2;
+        // AI prioritizes potion if low HP, else weapon
+        if (p.health < 40 && p.scrap >= 20) {
+          p.scrap -= 20; p.health = Math.min(p.maxHealth, p.health + 40);
+        } else if (!p.weapon && p.scrap >= 30) {
+          p.scrap -= 30; p.weapon = 'gun';
+        } else if (!p.weapon && p.scrap >= 45) {
+          p.scrap -= 45; p.weapon = 'katana';
+        } else if (p.weapon === 'gun' && p.scrap >= 35) {
+          p.scrap -= 35; p.armor = Math.min(3, p.armor + 1);
+        }
+        this.updateHUD();
+      }
+
+      buildTouchControls() {
+        const btnSize = 56;
+        const alpha = 0.35;
+
+        // P1 D-pad
+        const p1BaseX = 70, p1BaseY = GAME_HEIGHT - 160;
+        this.makeBtn(p1BaseX - 30, p1BaseY + 30, btnSize, alpha, '◀', () => this.touchState.p1Left = true, () => this.touchState.p1Left = false);
+        this.makeBtn(p1BaseX + 40, p1BaseY + 30, btnSize, alpha, '▶', () => this.touchState.p1Right = true, () => this.touchState.p1Right = false);
+        this.makeBtn(p1BaseX + 5, p1BaseY - 30, btnSize, alpha, '▲', () => this.touchState.p1Up = true, () => this.touchState.p1Up = false);
+        this.makeBtn(p1BaseX + 5, p1BaseY + 90, btnSize, alpha, '▼', () => this.touchState.p1Down = true, () => this.touchState.p1Down = false);
+
+        // P1 action
+        this.makeBtn(p1BaseX + 5, p1BaseY - 100, btnSize + 10, 0.55, '⚔', () => this.touchState.p1Action = true, () => this.touchState.p1Action = false, 0xcc3333);
+
+        // P2 D-pad
+        const p2BaseX = GAME_WIDTH - 70, p2BaseY = GAME_HEIGHT - 160;
+        this.makeBtn(p2BaseX - 40, p2BaseY + 30, btnSize, alpha, '◀', () => this.touchState.p2Left = true, () => this.touchState.p2Left = false);
+        this.makeBtn(p2BaseX + 30, p2BaseY + 30, btnSize, alpha, '▶', () => this.touchState.p2Right = true, () => this.touchState.p2Right = false);
+        this.makeBtn(p2BaseX - 5, p2BaseY - 30, btnSize, alpha, '▲', () => this.touchState.p2Up = true, () => this.touchState.p2Up = false);
+        this.makeBtn(p2BaseX - 5, p2BaseY + 90, btnSize, alpha, '▼', () => this.touchState.p2Down = true, () => this.touchState.p2Down = false);
+        this.makeBtn(p2BaseX - 5, p2BaseY - 100, btnSize + 10, 0.55, '⚔', () => this.touchState.p2Action = true, () => this.touchState.p2Action = false, 0x3355cc);
+      }
+
+      makeBtn(x, y, size, alpha, label, onDown, onUp, color = 0xffffff) {
+        const btn = this.add.rectangle(x, y, size, size, color, alpha).setInteractive().setDepth(30);
+        this.add.text(x, y, label, { fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#fff' }).setOrigin(0.5).setDepth(31);
+        btn.on('pointerdown', onDown);
+        btn.on('pointerup', onUp);
+        btn.on('pointerout', onUp);
+        return btn;
+      }
+
+      getAIName() {
+        return ['Michael Jackson', 'Verity', 'Falsity', 'Monkey'][this.aiIndex];
       }
 
       spawnItem() {
         if (this.gameOver) return;
-
         const roll = Phaser.Math.Between(1, 100);
         let isAnvil = false, isTrash = false, def;
 
-        if (roll <= 10) {
-          isAnvil = true;
-          def = this.anvilItem;
-        } else if (roll <= 65) {
-          isTrash = true;
-          def = Phaser.Utils.Array.GetRandom(this.trashItems);
-        } else {
-          def = Phaser.Utils.Array.GetRandom(this.nonTrashItems);
-        }
+        if (roll <= 8) { isAnvil = true; def = this.anvilItem; }
+        else if (roll <= 70) { isTrash = true; def = Phaser.Utils.Array.GetRandom(this.trashItems); }
+        else { def = Phaser.Utils.Array.GetRandom(this.nonTrashItems); }
 
-        const x = Phaser.Math.Between(20, GAME_WIDTH - 20);
+        // Spawn in either P1 or P2 zone
+        const inP1 = Math.random() < 0.5;
+        const zone = inP1 ? ZONE.p1 : ZONE.p2;
+        const x = Phaser.Math.Between(zone.x + 30, zone.x + zone.w - 30);
+
         const sprite = this.add.sprite(x, -40, def.key).setDepth(5);
 
-        // ---- GLOW EFFECTS ----
+        // Glow
         if (isTrash) {
-          // Red glow for trash
-          sprite.setTint(0xff8888);
-          this.tweens.add({ targets: sprite, alpha: { from: 0.85, to: 1 }, duration: 400, yoyo: true, repeat: -1 });
+          sprite.setTint(0xff9999);
+          this.tweens.add({ targets: sprite, scaleX: { from: 1, to: 1.15 }, scaleY: { from: 1, to: 1.15 }, duration: 500, yoyo: true, repeat: -1 });
         } else if (!isAnvil) {
-          // Green glow for normal items
-          sprite.setTint(0x88ff88);
-          this.tweens.add({ targets: sprite, alpha: { from: 0.85, to: 1 }, duration: 400, yoyo: true, repeat: -1 });
+          sprite.setTint(0x99ff99);
+          this.tweens.add({ targets: sprite, scaleX: { from: 1, to: 1.1 }, scaleY: { from: 1, to: 1.1 }, duration: 500, yoyo: true, repeat: -1 });
         } else {
-          // Anvil is plain
-          sprite.setTint(0xaa4444);
+          sprite.setTint(0xff6666);
         }
 
         this.fallingItems.push({
-          sprite, def, isTrash, isAnvil,
-          speed: isAnvil ? 180 : Phaser.Math.Between(120, 220),
-          vx: isAnvil ? 0 : Phaser.Math.Between(-20, 20)
+          sprite, def, isTrash, isAnvil, zone: inP1 ? 'p1' : 'p2',
+          speed: isAnvil ? 200 : Phaser.Math.Between(140, 240),
+          vx: isAnvil ? 0 : Phaser.Math.Between(-15, 15)
         });
-      }
-
-      offerWeapon(player) {
-        if (this.gameOver) return;
-        const p = player === 'p1' ? this.p1 : this.p2;
-        if (p.weaponLevel >= this.weaponShop.length) return; // maxed
-
-        const nextWeapon = this.weaponShop[p.weaponLevel];
-        if (p.scrap < nextWeapon.cost) return;
-
-        // Show purchase prompt as a floating text button near the player
-        const x = player === 'p1' ? 240 : 720;
-        const y = player === 'p1' ? 500 : 500;
-
-        const bg = this.add.rectangle(x, y, 260, 60, 0x000000, 0.85).setStrokeStyle(2, 0xffdd44).setDepth(50);
-        const label = this.add.text(x, y - 10, `Buy ${nextWeapon.name}? (${nextWeapon.cost} scrap)`, {
-          fontFamily: 'Arial', fontSize: '13px', color: '#ffdd44'
-        }).setOrigin(0.5).setDepth(51);
-        const buyBtn = this.add.text(x - 50, y + 15, 'BUY', {
-          fontFamily: 'Arial Black', fontSize: '16px', color: '#44ff44', backgroundColor: '#2a4a2a', padding: { x: 12, y: 4 }
-        }).setOrigin(0.5).setInteractive().setDepth(51);
-        const skipBtn = this.add.text(x + 50, y + 15, 'SKIP', {
-          fontFamily: 'Arial Black', fontSize: '16px', color: '#ff8888', backgroundColor: '#4a2a2a', padding: { x: 12, y: 4 }
-        }).setOrigin(0.5).setInteractive().setDepth(51);
-
-        const cleanup = () => { bg.destroy(); label.destroy(); buyBtn.destroy(); skipBtn.destroy(); };
-        buyBtn.on('pointerdown', () => {
-          if (p.scrap >= nextWeapon.cost) {
-            p.scrap -= nextWeapon.cost;
-            p.weaponLevel++;
-            p.weaponName = nextWeapon.name;
-            this.updateHUD();
-            this.showFloatingText(player === 'p1' ? this.p1.x : this.p2.x, 450, `Upgraded to ${nextWeapon.name}!`, '#ffdd44');
-          }
-          cleanup();
-        });
-        skipBtn.on('pointerdown', cleanup);
-
-        // Auto-cleanup after 4 seconds
-        this.time.delayedCall(4000, cleanup);
       }
 
       updateHUD() {
-        this.p1ScoreText.setText('P1: ' + this.p1.score);
-        this.p2ScoreText.setText('P2: ' + this.p2.score);
-        this.p1HealthText.setText(Math.max(0, this.p1.health) + '/' + this.p1.maxHealth);
-        this.p2HealthText.setText(Math.max(0, this.p2.health) + '/' + this.p2.maxHealth);
+        this.p1ScoreText.setText(this.p1.score + ' pts');
+        this.p2ScoreText.setText(this.p2.score + ' pts');
+        this.p1HealthText.setText(Math.max(0, Math.round(this.p1.health)));
+        this.p2HealthText.setText(Math.max(0, Math.round(this.p2.health)));
         this.p1ScrapText.setText('Scrap: ' + this.p1.scrap);
         this.p2ScrapText.setText('Scrap: ' + this.p2.scrap);
-        this.p1WeaponText.setText('Weapon: ' + (this.p1.weaponName === 'None' ? 'None' : this.p1.weaponName + ' Lv' + this.p1.weaponLevel));
-        this.p2WeaponText.setText('Weapon: ' + (this.p2.weaponName === 'None' ? 'None' : this.p2.weaponName + ' Lv' + this.p2.weaponLevel));
+        this.p1WeaponText.setText(this.p1.weapon ? '🔫 ' + (this.p1.weapon === 'gun' ? 'Auto Gun' : 'Katana') : 'No weapon');
+        this.p2WeaponText.setText(this.p2.weapon ? '🔫 ' + (this.p2.weapon === 'gun' ? 'Auto Gun' : 'Katana') : 'No weapon');
 
-        // Health bar fill
         const p1Pct = Math.max(0, this.p1.health / this.p1.maxHealth);
         const p2Pct = Math.max(0, this.p2.health / this.p2.maxHealth);
-        this.p1HealthFill.setDisplaySize(220 * p1Pct, 16);
-        this.p2HealthFill.setDisplaySize(220 * p2Pct, 16);
-        this.p1HealthFill.setTint(p1Pct > 0.5 ? 0x44ff44 : p1Pct > 0.25 ? 0xffaa44 : 0xff4444);
-        this.p2HealthFill.setTint(p2Pct > 0.5 ? 0x44ff44 : p2Pct > 0.25 ? 0xffaa44 : 0xff4444);
+        this.p1HealthFill.setDisplaySize(200 * p1Pct, 14);
+        this.p2HealthFill.setDisplaySize(200 * p2Pct, 14);
+        this.p1HealthFill.setFillStyle(p1Pct > 0.5 ? 0x44ff44 : p1Pct > 0.25 ? 0xffaa44 : 0xff4444);
+        this.p2HealthFill.setFillStyle(p2Pct > 0.5 ? 0x44ff44 : p2Pct > 0.25 ? 0xffaa44 : 0xff4444);
       }
 
       showFloatingText(x, y, text, color) {
         const t = this.add.text(x, y, text, {
-          fontFamily: 'Arial Black', fontSize: '20px', color: color,
-          stroke: '#000', strokeThickness: 3
+          fontFamily: 'Trebuchet MS', fontSize: '20px', fontStyle: 'bold', color,
+          stroke: '#000', strokeThickness: 4
         }).setOrigin(0.5).setDepth(60);
-        this.tweens.add({ targets: t, y: y - 60, alpha: 0, duration: 1000, onComplete: () => t.destroy() });
+        this.tweens.add({ targets: t, y: y - 70, alpha: 0, duration: 1000, onComplete: () => t.destroy() });
       }
 
       update(time, delta) {
         if (this.gameOver) return;
         const dt = delta / 1000;
 
-        // ---- P1 movement ----
+        // ---- Movement ----
+        this.handleMovement('p1', dt);
+        if (this.mode === '2p') this.handleMovement('p2', dt);
+        else this.handleAI(dt);
+
+        // ---- Battle detection ----
+        this.p1.inBattle = this.p1.x > ZONE.mid.x;
+        this.p2.inBattle = this.p2.x < ZONE.mid.x + ZONE.mid.w;
+
+        // ---- Attack/fire ----
         if (!this.p1.stunned) {
-          let mx = 0;
+          this.p1.attackCooldown -= delta;
+          this.p1.fireCooldown -= delta;
+
+          const p1Action = this.keys.w.isDown || this.touchState.p1Action;
+          if (p1Action && this.p1.inBattle && this.p1.weapon) {
+            if (this.p1.weapon === 'katana' && this.p1.attackCooldown <= 0) {
+              this.meleeAttack('p1'); this.p1.attackCooldown = 600;
+            } else if (this.p1.weapon === 'gun' && this.p1.fireCooldown <= 0) {
+              this.fireBullet('p1'); this.p1.fireCooldown = 400;
+            }
+          }
+        }
+
+        if (!this.p2.stunned) {
+          this.p2.attackCooldown -= delta;
+          this.p2.fireCooldown -= delta;
+
+          const p2Action = this.mode === '2p'
+            ? (this.keys.up.isDown || this.touchState.p2Action)
+            : this.p2.inBattle && this.p2.weapon && Math.abs(this.p2.x - this.p1.x) < 250;
+
+          if (p2Action && this.p2.inBattle && this.p2.weapon) {
+            if (this.p2.weapon === 'katana' && this.p2.attackCooldown <= 0) {
+              this.meleeAttack('p2'); this.p2.attackCooldown = 600;
+            } else if (this.p2.weapon === 'gun' && this.p2.fireCooldown <= 0) {
+              this.fireBullet('p2'); this.p2.fireCooldown = 500;
+            }
+          }
+        }
+
+        // ---- Update sprites ----
+        this.updateSprites(delta);
+
+        // ---- Falling items ----
+        this.updateItems(dt);
+
+        // ---- Bullets ----
+        this.updateBullets(dt);
+
+        // ---- Stun timers ----
+        this.updateStun('p1', delta);
+        this.updateStun('p2', delta);
+
+        this.updateHUD();
+      }
+
+      handleMovement(side, dt) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        if (p.stunned) { p.vx = 0; return; }
+
+        let mx = 0;
+        if (side === 'p1') {
           if (this.keys.a.isDown || this.touchState.p1Left) mx -= 1;
           if (this.keys.d.isDown || this.touchState.p1Right) mx += 1;
-          this.p1.vx = mx * 260;
-          if (mx !== 0) this.p1.facing = mx;
-
-          // Attack (P1: spacebar or touch button)
-          this.p1.attackCooldown -= delta;
-          if ((this.keys.w.isDown || this.touchState.p1Attack) && this.p1.attackCooldown <= 0 && this.p1.weaponLevel > 0) {
-            this.performAttack('p1');
-            this.p1.attackCooldown = 800;
-          }
         } else {
-          this.p1.vx = 0;
-          this.p1.stunTimer -= delta;
-          if (this.p1.stunTimer <= 0) {
-            this.p1.stunned = false;
-            this.p1StunText.setVisible(false);
-            this.p1Sprite.clearTint();
-          }
+          if (this.keys.left.isDown || this.touchState.p2Left) mx -= 1;
+          if (this.keys.right.isDown || this.touchState.p2Right) mx += 1;
         }
+        p.vx = mx * 260;
+        if (mx !== 0) p.facing = mx;
+        p.x = Phaser.Math.Clamp(p.x + p.vx * dt, 20, GAME_WIDTH - 20);
+      }
 
-        // ---- P2 movement ----
-        if (this.mode === '2p') {
-          if (!this.p2.stunned) {
-            let mx = 0;
-            if (this.keys.left.isDown || this.touchState.p2Left) mx -= 1;
-            if (this.keys.right.isDown || this.touchState.p2Right) mx += 1;
-            this.p2.vx = mx * 260;
-            if (mx !== 0) this.p2.facing = mx;
+      handleAI(dt) {
+        const p = this.p2;
+        if (p.stunned) { p.vx = 0; return; }
 
-            this.p2.attackCooldown -= delta;
-            if ((this.keys.up.isDown || this.touchState.p2Attack) && this.p2.attackCooldown <= 0 && this.p2.weaponLevel > 0) {
-              this.performAttack('p2');
-              this.p2.attackCooldown = 800;
-            }
+        // If has weapon and enough health, go to battleground to fight
+        if (p.weapon && p.health > 30) {
+          // Move towards battleground center
+          const targetX = ZONE.mid.cx;
+          const dx = targetX - p.x;
+          if (Math.abs(dx) > 10) {
+            p.vx = Math.sign(dx) * 220;
+            p.facing = Math.sign(dx);
           } else {
-            this.p2.vx = 0;
-            this.p2.stunTimer -= delta;
-            if (this.p2.stunTimer <= 0) {
-              this.p2.stunned = false;
-              this.p2StunText.setVisible(false);
-              this.p2Sprite.clearTint();
-            }
-          }
-        } else {
-          // AI
-          if (!this.p2.stunned) {
-            let targetX = 720;
-            let bestDist = Infinity;
-            for (const item of this.fallingItems) {
-              if (item.isTrash && !item.isAnvil) {
-                const d = Math.abs(item.sprite.x - this.p2.x) + Math.abs(item.sprite.y - this.p2.y) * 0.5;
-                if (d < bestDist) { bestDist = d; targetX = item.sprite.x; }
+            p.vx = 0;
+            // Move towards player if in battleground
+            if (this.p1.inBattle) {
+              const dxP = this.p1.x - p.x;
+              if (Math.abs(dxP) > 80) {
+                p.vx = Math.sign(dxP) * 200;
+                p.facing = Math.sign(dxP);
               }
             }
-            const dx = targetX - this.p2.x;
-            if (Math.abs(dx) > 6) {
-              this.p2.vx = Math.sign(dx) * 220;
-              this.p2.facing = Math.sign(dx);
-            } else {
-              this.p2.vx = 0;
+          }
+        } else {
+          // Collect in own zone
+          let targetX = p.x;
+          let bestDist = Infinity;
+          for (const item of this.fallingItems) {
+            if (item.zone === 'p2' && item.isTrash) {
+              const d = Math.abs(item.sprite.x - p.x) + Math.abs(item.sprite.y - p.y) * 0.3;
+              if (d < bestDist) { bestDist = d; targetX = item.sprite.x; }
             }
-
-            // AI attacks when close
-            this.p2.attackCooldown -= delta;
-            if (Math.abs(this.p2.x - this.p1.x) < 120 && this.p2.attackCooldown <= 0 && this.p2.weaponLevel > 0) {
-              this.performAttack('p2');
-              this.p2.attackCooldown = 1000;
-            }
+          }
+          if (bestDist === Infinity) targetX = ZONE.p2.cx;
+          const dx = targetX - p.x;
+          if (Math.abs(dx) > 6) {
+            p.vx = Math.sign(dx) * 240;
+            p.facing = Math.sign(dx);
           } else {
-            this.p2.vx = 0;
-            this.p2.stunTimer -= delta;
-            if (this.p2.stunTimer <= 0) {
-              this.p2.stunned = false;
-              this.p2StunText.setVisible(false);
-              this.p2Sprite.clearTint();
-            }
+            p.vx = 0;
           }
         }
 
-        // Apply movement
-        this.p1.x = Phaser.Math.Clamp(this.p1.x + this.p1.vx * dt, 30, 450);
-        this.p2.x = Phaser.Math.Clamp(this.p2.x + this.p2.vx * dt, 510, 930);
+        p.x = Phaser.Math.Clamp(p.x + p.vx * dt, ZONE.p2.x + 20, GAME_WIDTH - 20);
+      }
 
-        // Bob animation
+      updateSprites(delta) {
         this.p1.animTimer += delta;
         this.p2.animTimer += delta;
-        const bob1 = Math.sin(this.p1.animTimer * 0.01) * 2;
-        const bob2 = Math.sin(this.p2.animTimer * 0.01) * 2;
+        const bob1 = Math.sin(this.p1.animTimer * 0.008) * 2;
+        const bob2 = Math.sin(this.p2.animTimer * 0.008) * 2;
 
         this.p1Sprite.setPosition(this.p1.x, this.p1.y + bob1).setFlipX(this.p1.facing < 0);
         this.p1Bin.setPosition(this.p1.x, this.p1.y - 30 + bob1);
         this.p2Sprite.setPosition(this.p2.x, this.p2.y + bob2).setFlipX(this.p2.facing < 0);
         this.p2Bin.setPosition(this.p2.x, this.p2.y - 30 + bob2);
 
-        // Falling items
+        this.p1StunText.setPosition(this.p1.x, this.p1.y - 90);
+        this.p2StunText.setPosition(this.p2.x, this.p2.y - 90);
+      }
+
+      updateItems(dt) {
         for (let i = this.fallingItems.length - 1; i >= 0; i--) {
           const item = this.fallingItems[i];
           item.sprite.y += item.speed * dt;
           item.sprite.x += item.vx * dt;
           item.sprite.rotation += 0.02;
 
-          const d1 = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p1.x, this.p1.y - 20);
-          const d2 = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p2.x, this.p2.y - 20);
+          // Collision with players (only in their own zones OR battleground)
+          const p1Active = item.zone === 'p1' && this.p1.x < ZONE.mid.x + 50;
+          const p2Active = item.zone === 'p2' && this.p2.x > ZONE.mid.x + ZONE.mid.w - 50;
 
           let caught = false;
-          if (d1 < 40 && item.sprite.y < this.p1.y + 20 && item.sprite.y > this.p1.y - 60) {
-            this.handleCatch(item, 'p1'); caught = true;
-          } else if (d2 < 40 && item.sprite.y < this.p2.y + 20 && item.sprite.y > this.p2.y - 60) {
-            this.handleCatch(item, 'p2'); caught = true;
+          if (p1Active) {
+            const d = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p1.x, this.p1.y - 20);
+            if (d < 42) { this.handleCatch(item, 'p1'); caught = true; }
+          }
+          if (!caught && p2Active) {
+            const d = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p2.x, this.p2.y - 20);
+            if (d < 42) { this.handleCatch(item, 'p2'); caught = true; }
           }
 
           if (caught || item.sprite.y > GAME_HEIGHT + 50) {
@@ -597,24 +766,72 @@
             this.fallingItems.splice(i, 1);
           }
         }
-
-        this.updateHUD();
       }
 
-      performAttack(player) {
-        const attacker = player === 'p1' ? this.p1 : this.p2;
-        const defender = player === 'p1' ? this.p2 : this.p1;
-        const weapon = this.weaponShop[attacker.weaponLevel - 1];
-        if (!weapon) return;
+      updateBullets(dt) {
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+          const b = this.bullets[i];
+          b.sprite.x += b.vx * dt;
+          b.sprite.y += b.vy * dt;
 
-        // Check range
-        if (Math.abs(attacker.x - defender.x) > 150) return;
+          const target = b.owner === 'p1' ? this.p2 : this.p1;
+          const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, target.x, target.y - 20);
 
-        // Deal damage
-        defender.health -= weapon.damage;
+          if (d < 30) {
+            const dmg = Math.max(2, 10 - target.armor * 3);
+            target.health -= dmg;
+            this.showFloatingText(target.x, target.y - 60, `-${dmg}`, '#ff4444');
+            b.sprite.destroy();
+            this.bullets.splice(i, 1);
+            if (target.health <= 0) this.endGame(b.owner);
+            continue;
+          }
+
+          if (b.sprite.x < 0 || b.sprite.x > GAME_WIDTH || b.sprite.y < 0 || b.sprite.y > GAME_HEIGHT) {
+            b.sprite.destroy();
+            this.bullets.splice(i, 1);
+          }
+        }
+      }
+
+      updateStun(side, delta) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        const text = side === 'p1' ? this.p1StunText : this.p2StunText;
+        const sprite = side === 'p1' ? this.p1Sprite : this.p2Sprite;
+
+        if (p.stunned) {
+          p.stunTimer -= delta;
+          if (p.stunTimer <= 0) {
+            p.stunned = false;
+            text.setVisible(false);
+            sprite.clearTint();
+          }
+        }
+      }
+
+      fireBullet(side) {
+        const p = side === 'p1' ? this.p1 : this.p2;
+        const target = side === 'p1' ? this.p2 : this.p1;
+        const angle = Phaser.Math.Angle.Between(p.x, p.y - 20, target.x, target.y - 20);
+
+        const sprite = this.add.sprite(p.x + Math.cos(angle) * 30, p.y - 20 + Math.sin(angle) * 20, 'bullet').setDepth(15);
+        this.bullets.push({
+          sprite, vx: Math.cos(angle) * 500, vy: Math.sin(angle) * 500, owner: side
+        });
+      }
+
+      meleeAttack(side) {
+        const attacker = side === 'p1' ? this.p1 : this.p2;
+        const defender = side === 'p1' ? this.p2 : this.p1;
+
+        if (Math.abs(attacker.x - defender.x) > 130) return;
+
+        const dmg = Math.max(3, 18 - defender.armor * 4);
+        defender.health -= dmg;
         defender.stunned = true;
-        defender.stunTimer = 800;
-        if (player === 'p1') {
+        defender.stunTimer = 600;
+
+        if (side === 'p1') {
           this.p2StunText.setVisible(true);
           this.p2Sprite.setTint(0xff4444);
         } else {
@@ -622,59 +839,41 @@
           this.p1Sprite.setTint(0xff4444);
         }
 
-        // Visual slash effect
-        const slashX = player === 'p1' ? this.p1.x + 40 * this.p1.facing : this.p2.x + 40 * this.p2.facing;
-        const slash = this.add.text(slashX, attacker.y - 20, '💥', { fontSize: '32px' }).setOrigin(0.5).setDepth(40);
-        this.tweens.add({ targets: slash, scale: 2, alpha: 0, duration: 300, onComplete: () => slash.destroy() });
+        // Slash visual
+        const slash = this.add.sprite(attacker.x + 30 * attacker.facing, attacker.y - 20, 'slash').setDepth(40).setFlipX(attacker.facing < 0);
+        this.tweens.add({ targets: slash, alpha: 0, scaleX: 2, duration: 250, onComplete: () => slash.destroy() });
 
-        this.showFloatingText(defender.x, defender.y - 60, `-${weapon.damage}`, '#ff4444');
+        this.showFloatingText(defender.x, defender.y - 70, `-${dmg}`, '#ff4444');
 
-        // Check death
-        if (defender.health <= 0) {
-          defender.health = 0;
-          this.endGame(player);
-        }
+        if (defender.health <= 0) this.endGame(side);
       }
 
-      handleCatch(item, player) {
-        const isP1 = player === 'p1';
-        const p = isP1 ? this.p1 : this.p2;
-        let points = item.def.points;
+      handleCatch(item, side) {
+        const p = side === 'p1' ? this.p1 : this.p2;
 
         if (item.isAnvil) {
-          points = -Phaser.Math.Between(20, 50);
-          p.health -= 15;
+          const dmg = Phaser.Math.Between(20, 40);
+          p.health -= dmg;
           p.stunned = true;
-          p.stunTimer = 2000;
-          if (isP1) {
-            this.p1StunText.setVisible(true);
-            this.p1Sprite.setTint(0xff4444);
-          } else {
-            this.p2StunText.setVisible(true);
-            this.p2Sprite.setTint(0xff4444);
-          }
-          this.showFloatingText(isP1 ? this.p1.x : this.p2.x, (isP1 ? this.p1.y : this.p2.y) - 60, `ANVIL! -${Math.abs(points)}`, '#ff4444');
+          p.stunTimer = 1500;
+          const stunText = side === 'p1' ? this.p1StunText : this.p2StunText;
+          const sprite = side === 'p1' ? this.p1Sprite : this.p2Sprite;
+          stunText.setVisible(true);
+          sprite.setTint(0xff4444);
+          this.showFloatingText(p.x, p.y - 70, `ANVIL -${dmg}`, '#ff4444');
         } else if (item.isTrash) {
-          // Trash gives points AND scrap
-          p.score += points;
-          p.scrap += Math.ceil(points / 5);
-          this.showFloatingText(isP1 ? this.p1.x : this.p2.x, (isP1 ? this.p1.y : this.p2.y) - 60, `+${points}`, '#44ff44');
+          p.score += item.def.points;
+          p.scrap += item.def.scrap;
+          this.showFloatingText(p.x, p.y - 70, `+${item.def.points}`, '#44ff44');
         } else {
-          // Normal items deduct score AND health
-          p.score += points;
-          p.health += points; // points is negative
-          this.showFloatingText(isP1 ? this.p1.x : this.p2.x, (isP1 ? this.p1.y : this.p2.y) - 60, `${points} HP`, '#ff8800');
+          p.score += item.def.points;
+          const hpDmg = Math.abs(item.def.points);
+          p.health -= hpDmg;
+          this.showFloatingText(p.x, p.y - 70, `-${hpDmg} HP`, '#ffaa44');
         }
 
-        // Clamp health
         p.health = Math.max(0, Math.min(p.maxHealth, p.health));
-
-        // Check death
-        if (p.health <= 0) {
-          this.endGame(isP1 ? 'p2' : 'p1');
-        }
-
-        this.updateHUD();
+        if (p.health <= 0) this.endGame(side === 'p1' ? 'p2' : 'p1');
       }
 
       endGame(winner) {
@@ -682,18 +881,21 @@
         const winText = winner === 'p1' ? 'PLAYER 1 WINS!' : (this.mode === 'ai' ? 'AI WINS!' : 'PLAYER 2 WINS!');
         const color = winner === 'p1' ? '#44ff44' : '#ff4444';
 
-        const overlay = this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75).setDepth(100);
-        const title = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 60, winText, {
-          fontFamily: 'Arial Black', fontSize: '48px', color: color, stroke: '#000', strokeThickness: 6
-        }).setOrigin(0.5).setDepth(101);
-        const scoreLine = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 20, `P1: ${this.p1.score}  |  P2: ${this.p2.score}`, {
-          fontFamily: 'Arial', fontSize: '24px', color: '#fff'
-        }).setOrigin(0.5).setDepth(101);
+        this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8).setDepth(300);
+        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 80, winText, {
+          fontFamily: 'Trebuchet MS', fontSize: '56px', fontStyle: 'bold', color,
+          stroke: '#000', strokeThickness: 8
+        }).setOrigin(0.5).setDepth(301);
 
-        const restartBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 100, 'PLAY AGAIN', {
-          fontFamily: 'Arial Black', fontSize: '24px', color: '#fff', backgroundColor: '#2a6a2a', padding: { x: 30, y: 12 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(101);
-        restartBtn.on('pointerdown', () => this.scene.start('Menu'));
+        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 10, `P1: ${this.p1.score} pts  |  P2: ${this.p2.score} pts`, {
+          fontFamily: 'Trebuchet MS', fontSize: '24px', color: '#fff'
+        }).setOrigin(0.5).setDepth(301);
+
+        const btn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 110, 'PLAY AGAIN', {
+          fontFamily: 'Trebuchet MS', fontSize: '26px', fontStyle: 'bold', color: '#fff',
+          backgroundColor: '#2a6a2a', padding: { x: 40, y: 14 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(301);
+        btn.on('pointerdown', () => this.scene.start('Menu'));
       }
     }
 
@@ -703,7 +905,7 @@
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
       parent: 'game-container',
-      backgroundColor: '#0d1a0d',
+      backgroundColor: '#0a0f0a',
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -712,10 +914,7 @@
       },
       scene: [BootScene, MenuScene, GameScene],
       physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
-      input: {
-        activePointers: 4, // multi-touch support
-        touch: { capture: true }
-      }
+      input: { activePointers: 4, touch: { capture: true } }
     };
 
     new Phaser.Game(config);
