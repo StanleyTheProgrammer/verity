@@ -23,20 +23,13 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script>
     // ============================================================
-    //  ENVIRONMENT BATTLE v3
-    //  - 3 zones: P1 collect | BATTLEGROUND | P2 collect
-    //  - Shop with weapons, health potions
-    //  - Clean UI, glowing items, multi-touch
+    //  ENVIRONMENT BATTLE v4
+    //  - No battleground: free movement, fight anywhere
+    //  - High HP, low damage: matches last longer
+    //  - Shop with weapons, potions, armor
     // ============================================================
     const GAME_WIDTH = 1200;
     const GAME_HEIGHT = 720;
-
-    // Zone boundaries
-    const ZONE = {
-      p1:   { x: 0,    w: 350, cx: 175 },
-      mid:  { x: 350,  w: 500, cx: 600 },
-      p2:   { x: 850,  w: 350, cx: 1025 }
-    };
     const GROUND_Y = 600;
 
     // ---------- BOOT ----------
@@ -50,14 +43,14 @@
         const g = this.add.graphics(); g.setVisible(false);
         const tex = (k,w,h) => g.generateTexture(k,w,h);
 
-        // ---- TRASH (red glow) ----
+        // ---- TRASH ----
         g.clear(); g.fillStyle(0xdddddd); g.fillRoundedRect(4,8,20,28,4); g.fillStyle(0xcc3333); g.fillRoundedRect(4,8,20,8,4); g.fillStyle(0x999999); g.fillRect(6,16,16,3); tex('trashCan',28,40);
         g.clear(); g.fillStyle(0x44aa44); g.fillRoundedRect(8,6,12,30,4); g.fillStyle(0x66cc66); g.fillRect(6,2,16,8); tex('trashBottle',28,40);
         g.clear(); g.fillStyle(0x444444); g.fillCircle(14,22,12); g.fillStyle(0x666666); g.fillCircle(10,18,4); tex('trashBag',28,40);
         g.clear(); g.fillStyle(0xf0f0f0); g.fillRect(2,10,24,20); g.fillStyle(0xcccccc); g.fillRect(4,14,20,3); g.fillRect(4,20,20,3); tex('trashPaper',28,40);
         g.clear(); g.fillStyle(0xbb9977); g.fillRoundedRect(2,8,24,24,3); g.fillStyle(0x997755); g.fillRect(2,8,24,4); tex('trashBox',28,40);
 
-        // ---- NORMAL (green glow) ----
+        // ---- NORMAL ----
         g.clear(); g.fillStyle(0xee3333); g.fillCircle(14,22,12); g.fillStyle(0x44aa44); g.fillRect(12,6,4,8); tex('apple',28,40);
         g.clear(); g.fillStyle(0xff9900); g.fillCircle(14,22,12); g.fillStyle(0xcc6600); g.fillRect(12,8,4,6); tex('orange',28,40);
         g.clear(); g.fillStyle(0x4488ff); g.fillRoundedRect(7,10,14,22,3); g.fillStyle(0x2266cc); g.fillRect(5,8,18,5); tex('cup',28,40);
@@ -88,7 +81,7 @@
         g.clear(); g.fillStyle(0xeedd99); g.fillRect(0,0,1200,720); g.fillStyle(0x4488cc); for(let i=0;i<12;i++){ g.fillEllipse(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,GROUND_Y), Phaser.Math.Between(50,120), Phaser.Math.Between(15,40)); } g.fillStyle(0xdcc880); g.fillRect(0,GROUND_Y,1200,120); tex('mapBeach',1200,720);
         g.clear(); g.fillStyle(0xccddee); g.fillRect(0,0,1200,720); g.fillStyle(0xffffff); for(let i=0;i<50;i++){ g.fillCircle(Phaser.Math.Between(0,1200), Phaser.Math.Between(0,720), Phaser.Math.Between(5,15)); } g.fillStyle(0xbbccdd); g.fillRect(0,GROUND_Y,1200,120); tex('mapSnow',1200,720);
 
-        // ---- UI ----
+        // ---- HUD ----
         g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,350,120,0); tex('hudP1',350,120);
         g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,500,120,0); tex('hudMid',500,120);
         g.clear(); g.fillStyle(0x000000, 0.55); g.fillRoundedRect(0,0,350,120,0); tex('hudP2',350,120);
@@ -99,8 +92,9 @@
         g.clear(); g.fillStyle(0x44aaff); g.fillRect(7,2,6,22); g.fillStyle(0x66ccff); g.fillCircle(10,24,6); tex('iconGun',20,30);
         g.clear(); g.fillStyle(0xcccccc); g.fillRect(8,0,4,26); g.fillStyle(0xffdd44); g.fillRect(2,26,16,4); tex('iconKatana',20,30);
         g.clear(); g.fillStyle(0x44ff44); g.fillCircle(10,15,10); g.fillStyle(0xffffff); g.fillRect(6,14,8,2); g.fillRect(9,11,2,8); tex('iconPotion',20,30);
+        g.clear(); g.fillStyle(0x88bbff); g.fillRoundedRect(3,5,14,20,3); g.fillStyle(0xffffff); g.fillRect(6,10,8,2); g.fillRect(6,16,8,2); tex('iconArmor',20,30);
 
-        // ---- AMMO ----
+        // ---- BULLET ----
         g.clear(); g.fillStyle(0xffdd44); g.fillCircle(3,3,3); tex('bullet',6,6);
 
         // ---- SLASH ----
@@ -114,7 +108,6 @@
     class MenuScene extends Phaser.Scene {
       constructor() { super('Menu'); }
       create() {
-        // Background
         this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_WIDTH, GAME_HEIGHT, 0x0a1a0a);
         this.add.rectangle(GAME_WIDTH/2, 0, GAME_WIDTH, 200, 0x1a3a1a).setOrigin(0.5, 0);
 
@@ -141,7 +134,7 @@
         vsAI.on('pointerout', () => vsAI.setStyle({ backgroundColor: '#1a5a7a' }));
         vsAI.on('pointerdown', () => this.showAISelect());
 
-        // Map select
+        // Map
         this.add.text(GAME_WIDTH/2, 360, 'MAP', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#88aa88' }).setOrigin(0.5);
         this.mapNames = ['Park', 'City', 'Beach', 'Snow'];
         this.mapColors = [0x3a5f3a, 0x2a2a3a, 0xeedd99, 0xccddee];
@@ -150,18 +143,18 @@
         for (let i = 0; i < 4; i++) {
           const x = GAME_WIDTH/2 - 240 + i * 160;
           const bg = this.add.rectangle(x, 420, 140, 70, this.mapColors[i]).setStrokeStyle(3, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
-          const label = this.add.text(x, 420, this.mapNames[i], {
+          this.add.text(x, 420, this.mapNames[i], {
             fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold',
             color: i === 2 ? '#333' : '#fff'
           }).setOrigin(0.5);
           bg.on('pointerdown', () => {
             this.selectedMap = i;
-            this.mapButtons.forEach((b, j) => b.bg.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
+            this.mapButtons.forEach((b, j) => b.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
           });
-          this.mapButtons.push({ bg, label });
+          this.mapButtons.push(bg);
         }
 
-        // Skin select
+        // Skin
         this.add.text(GAME_WIDTH/2, 500, 'YOUR SKIN', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#88aa88' }).setOrigin(0.5);
         this.skinKeys = ['player1', 'playerMJ', 'playerVerity', 'playerFalsity', 'playerMonkey'];
         this.skinNames = ['Green', 'MJ', 'Verity', 'Falsity', 'Monkey'];
@@ -171,14 +164,14 @@
           const x = GAME_WIDTH/2 - 240 + i * 120;
           const bg = this.add.rectangle(x, 560, 100, 60, 0x1a2a1a).setStrokeStyle(3, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
           this.add.sprite(x - 20, 560, this.skinKeys[i]).setDisplaySize(30, 38);
-          const label = this.add.text(x + 18, 560, this.skinNames[i], {
+          this.add.text(x + 18, 560, this.skinNames[i], {
             fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#fff'
           }).setOrigin(0.5);
           bg.on('pointerdown', () => {
             this.p1Skin = i;
-            this.skinButtons.forEach((b, j) => b.bg.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
+            this.skinButtons.forEach((b, j) => b.setStrokeStyle(3, j === i ? 0xffdd44 : 0x444444));
           });
-          this.skinButtons.push({ bg, label });
+          this.skinButtons.push(bg);
         }
 
         // AI panel
@@ -197,15 +190,16 @@
           const y = GAME_HEIGHT/2 - 110 + i * 70;
           const bg = this.add.rectangle(GAME_WIDTH/2, y, 400, 56, 0x1a2a1a).setStrokeStyle(2, i === 0 ? 0xffdd44 : 0x444444).setInteractive({ useHandCursor: true });
           this.add.sprite(GAME_WIDTH/2 - 150, y, this.aiSkinKeys[i]).setDisplaySize(36, 46);
-          const label = this.add.text(GAME_WIDTH/2 + 10, y, aiOptions[i], {
+          this.add.text(GAME_WIDTH/2 + 10, y, aiOptions[i], {
             fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold', color: '#fff'
           }).setOrigin(0.5);
           bg.on('pointerdown', () => {
             this.selectedAI = i;
-            this.aiButtons.forEach((b, j) => b.bg.setStrokeStyle(2, j === i ? 0xffdd44 : 0x444444));
+            this.aiButtons.forEach((b, j) => b.setStrokeStyle(2, j === i ? 0xffdd44 : 0x444444));
           });
-          this.aiButtons.push({ bg, label });
-          this.aiPanel.add([bg, label]);
+          this.aiButtons.push(bg);
+          this.aiPanel.add(bg);
+          this.aiPanel.add(this.children.list[this.children.list.length - 2]); // the sprite
         }
 
         const startAIBtn = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 170, 'START BATTLE', {
@@ -257,22 +251,22 @@
           { key: 'trashBox', points: 25, scrap: 6 }
         ];
         this.nonTrashItems = [
-          { key: 'apple', points: -10, name: 'Apple' },
-          { key: 'orange', points: -15, name: 'Orange' },
-          { key: 'cup', points: -8, name: 'Cup' }
+          { key: 'apple', points: -8, name: 'Apple' },
+          { key: 'orange', points: -12, name: 'Orange' },
+          { key: 'cup', points: -6, name: 'Cup' }
         ];
-        this.anvilItem = { key: 'anvil', points: -30, name: 'Anvil' };
+        this.anvilItem = { key: 'anvil', points: -20, name: 'Anvil' };
 
-        // Shop catalog
+        // Shop — high HP, lower damage so matches last
         this.shopItems = [
-          { id: 'gun', name: 'Auto Gun', icon: 'iconGun', cost: 30, desc: 'Shoots bullets' },
-          { id: 'katana', name: 'Katana', icon: 'iconKatana', cost: 45, desc: 'Melee slash' },
+          { id: 'gun', name: 'Auto Gun', icon: 'iconGun', cost: 30, desc: 'Shoots bullets (6 dmg)' },
+          { id: 'katana', name: 'Katana', icon: 'iconKatana', cost: 45, desc: 'Melee slash (12 dmg)' },
           { id: 'potion', name: 'Health Potion', icon: 'iconPotion', cost: 20, desc: '+40 HP' },
-          { id: 'armor', name: 'Armor', icon: 'iconStick', cost: 35, desc: 'Reduce dmg' }
+          { id: 'armor', name: 'Armor', icon: 'iconArmor', cost: 35, desc: '-3 dmg per hit' }
         ];
 
-        this.p1 = this.createPlayer(175, 'p1');
-        this.p2 = this.createPlayer(1025, 'p2');
+        this.p1 = this.createPlayer(200, 'p1');
+        this.p2 = this.createPlayer(1000, 'p2');
 
         this.fallingItems = [];
         this.bullets = [];
@@ -282,38 +276,28 @@
       createPlayer(x, side) {
         return {
           x, y: GROUND_Y, vx: 0,
-          side, score: 0, health: 100, maxHealth: 100,
+          side, score: 0,
+          health: 200, maxHealth: 200,   // high HP
           stunned: false, stunTimer: 0,
           facing: side === 'p1' ? 1 : -1,
           animTimer: 0, scrap: 0,
-          weapon: null, // 'gun' | 'katana'
+          weapon: null,
           armor: 0,
           attackCooldown: 0,
-          fireCooldown: 0,
-          inBattle: false
+          fireCooldown: 0
         };
       }
 
       create() {
-        // Map
         this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, this.mapKeys[this.mapIndex]).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 
-        // Zone dividers
-        this.add.rectangle(ZONE.mid.x, GAME_HEIGHT/2, 3, GAME_HEIGHT, 0xffdd44, 0.5);
-        this.add.rectangle(ZONE.mid.x + ZONE.mid.w, GAME_HEIGHT/2, 3, GAME_HEIGHT, 0xffdd44, 0.5);
-
-        // Zone labels
-        this.add.text(ZONE.p1.cx, 140, 'P1 COLLECT', { fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#88ff88' }).setOrigin(0.5);
-        this.add.text(ZONE.mid.cx, 140, '⚔ BATTLEGROUND ⚔', { fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold', color: '#ffdd44' }).setOrigin(0.5);
-        this.add.text(ZONE.p2.cx, 140, this.mode === 'ai' ? 'AI COLLECT' : 'P2 COLLECT', { fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#88bbff' }).setOrigin(0.5);
-
         // HUDs
-        this.add.image(ZONE.p1.cx, 0, 'hudP1').setOrigin(0.5, 0);
-        this.add.image(ZONE.mid.cx, 0, 'hudMid').setOrigin(0.5, 0);
-        this.add.image(ZONE.p2.cx, 0, 'hudP2').setOrigin(0.5, 0);
+        this.add.image(175, 0, 'hudP1').setOrigin(0.5, 0);
+        this.add.image(600, 0, 'hudMid').setOrigin(0.5, 0);
+        this.add.image(1025, 0, 'hudP2').setOrigin(0.5, 0);
 
-        this.buildHUD('p1', ZONE.p1.cx);
-        this.buildHUD('p2', ZONE.p2.cx);
+        this.buildHUD('p1', 175);
+        this.buildHUD('p2', 1025);
         this.buildMidHUD();
 
         // Player sprites
@@ -343,21 +327,16 @@
         });
 
         this.touchState = {
-          p1Left: false, p1Right: false, p1Up: false, p1Down: false, p1Action: false,
-          p2Left: false, p2Right: false, p2Up: false, p2Down: false, p2Action: false
+          p1Left: false, p1Right: false, p1Action: false,
+          p2Left: false, p2Right: false, p2Action: false
         };
 
         this.buildTouchControls();
-
-        // Spawn timer — items fall in collection zones
         this.time.addEvent({ delay: 700, callback: this.spawnItem, callbackScope: this, loop: true });
-
-        // Shop button
-        this.buildShopButton();
+        this.buildShopButtons();
       }
 
       buildHUD(side, cx) {
-        const p = side === 'p1' ? this.p1 : this.p2;
         const name = side === 'p1' ? 'PLAYER 1' : (this.mode === 'ai' ? this.getAIName() : 'PLAYER 2');
         const color = side === 'p1' ? '#88ff88' : '#88bbff';
 
@@ -369,91 +348,81 @@
           fontFamily: 'Trebuchet MS', fontSize: '18px', fontStyle: 'bold', color: '#fff'
         }).setOrigin(0.5);
 
-        // Health bar
-        this.add.rectangle(cx, 62, 200, 14, 0x333333).setStrokeStyle(1, 0x000000);
-        this[side + 'HealthFill'] = this.add.rectangle(cx - 100, 62, 200, 14, 0x44ff44).setOrigin(0, 0.5);
-        this[side + 'HealthText'] = this.add.text(cx, 62, '100', {
+        this.add.rectangle(cx, 62, 220, 16, 0x333333).setStrokeStyle(1, 0x000000);
+        this[side + 'HealthFill'] = this.add.rectangle(cx - 110, 62, 220, 16, 0x44ff44).setOrigin(0, 0.5);
+        this[side + 'HealthText'] = this.add.text(cx, 62, '200', {
           fontFamily: 'Trebuchet MS', fontSize: '11px', fontStyle: 'bold', color: '#fff'
         }).setOrigin(0.5);
 
-        // Scrap
         this[side + 'ScrapText'] = this.add.text(cx, 84, 'Scrap: 0', {
           fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#ffdd44'
         }).setOrigin(0.5);
 
-        // Weapon
         this[side + 'WeaponText'] = this.add.text(cx, 104, 'No weapon', {
           fontFamily: 'Trebuchet MS', fontSize: '12px', color: '#aaa'
         }).setOrigin(0.5);
       }
 
       buildMidHUD() {
-        this.add.text(ZONE.mid.cx, 14, 'FIGHT!', {
-          fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold', color: '#ffdd44'
+        this.add.text(600, 14, 'ENVIRONMENT BATTLE', {
+          fontFamily: 'Trebuchet MS', fontSize: '20px', fontStyle: 'bold', color: '#ffdd44'
         }).setOrigin(0.5);
-        this.midStatusText = this.add.text(ZONE.mid.cx, 44, 'Collect scrap in your zone, then buy weapons', {
+        this.midStatusText = this.add.text(600, 44, 'Collect trash to earn Scrap · Shop for weapons', {
           fontFamily: 'Trebuchet MS', fontSize: '13px', color: '#ccc'
         }).setOrigin(0.5);
       }
 
-      buildShopButton() {
-        // Shop button in the middle HUD
-        const shopBtn = this.add.rectangle(ZONE.mid.cx, 90, 160, 36, 0x2a5a2a).setStrokeStyle(2, 0x88ff88).setInteractive({ useHandCursor: true });
-        this.add.text(ZONE.mid.cx, 90, '🛒 SHOP (P1)', {
+      buildShopButtons() {
+        const shopBtn = this.add.rectangle(600, 90, 160, 36, 0x2a5a2a).setStrokeStyle(2, 0x88ff88).setInteractive({ useHandCursor: true });
+        this.add.text(600, 90, '🛒 SHOP (P1)', {
           fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#fff'
         }).setOrigin(0.5);
         shopBtn.on('pointerdown', () => this.openShop('p1'));
 
-        // P2 shop button (for 2P mode)
         if (this.mode === '2p') {
-          const shopBtn2 = this.add.rectangle(ZONE.mid.cx, 130, 160, 36, 0x2a3a5a).setStrokeStyle(2, 0x88bbff).setInteractive({ useHandCursor: true });
-          this.add.text(ZONE.mid.cx, 130, '🛒 SHOP (P2)', {
+          const shopBtn2 = this.add.rectangle(600, 130, 160, 36, 0x2a3a5a).setStrokeStyle(2, 0x88bbff).setInteractive({ useHandCursor: true });
+          this.add.text(600, 130, '🛒 SHOP (P2)', {
             fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: '#fff'
           }).setOrigin(0.5);
           shopBtn2.on('pointerdown', () => this.openShop('p2'));
         } else {
-          // AI shops automatically
-          this.time.addEvent({ delay: 4000, callback: () => this.aiShop(), callbackScope: this, loop: true });
+          // AI shops periodically
+          this.time.addEvent({ delay: 3500, callback: () => this.aiShop(), callbackScope: this, loop: true });
         }
       }
 
       openShop(side) {
         const p = side === 'p1' ? this.p1 : this.p2;
-        const cx = side === 'p1' ? ZONE.p1.cx : ZONE.p2.cx;
-
-        // Shop overlay
         const overlay = this.add.container(0, 0).setDepth(200);
-        const bg = this.add.rectangle(ZONE.mid.cx, GAME_HEIGHT/2, 460, 500, 0x0a1a0a, 0.96).setStrokeStyle(3, 0xffdd44);
-        const title = this.add.text(ZONE.mid.cx, GAME_HEIGHT/2 - 220, `SHOP — ${side === 'p1' ? 'P1' : 'P2'}`, {
+        const bg = this.add.rectangle(600, GAME_HEIGHT/2, 460, 520, 0x0a1a0a, 0.97).setStrokeStyle(3, 0xffdd44);
+        const title = this.add.text(600, GAME_HEIGHT/2 - 230, `SHOP — ${side === 'p1' ? 'P1' : 'P2'}`, {
           fontFamily: 'Trebuchet MS', fontSize: '24px', fontStyle: 'bold', color: '#ffdd44'
         }).setOrigin(0.5);
-        const scrapText = this.add.text(ZONE.mid.cx, GAME_HEIGHT/2 - 180, `Your Scrap: ${p.scrap}`, {
+        const scrapText = this.add.text(600, GAME_HEIGHT/2 - 190, `Your Scrap: ${p.scrap}`, {
           fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#fff'
         }).setOrigin(0.5);
         overlay.add([bg, title, scrapText]);
 
-        // Close button
-        const closeBtn = this.add.text(ZONE.mid.cx + 210, GAME_HEIGHT/2 - 230, '✕', {
+        const closeBtn = this.add.text(600 + 210, GAME_HEIGHT/2 - 240, '✕', {
           fontFamily: 'Trebuchet MS', fontSize: '24px', color: '#ff8888'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         closeBtn.on('pointerdown', () => overlay.destroy());
         overlay.add(closeBtn);
 
-        // Shop items
         this.shopItems.forEach((item, i) => {
-          const y = GAME_HEIGHT/2 - 120 + i * 80;
+          const y = GAME_HEIGHT/2 - 130 + i * 78;
           const canAfford = p.scrap >= item.cost;
           const bgColor = canAfford ? 0x1a3a1a : 0x2a1a1a;
 
-          const itemBg = this.add.rectangle(ZONE.mid.cx, y, 380, 68, bgColor).setStrokeStyle(2, canAfford ? 0x44aa44 : 0x664444);
-          const icon = this.add.sprite(ZONE.mid.cx - 150, y, item.icon).setDisplaySize(28, 40);
-          const nameText = this.add.text(ZONE.mid.cx - 110, y - 12, item.name, {
+          const itemBg = this.add.rectangle(600, y, 390, 66, bgColor).setStrokeStyle(2, canAfford ? 0x44aa44 : 0x664444);
+          const icon = this.add.sprite(600 - 155, y, item.icon).setDisplaySize(28, 40);
+          const nameText = this.add.text(600 - 115, y - 12, item.name, {
             fontFamily: 'Trebuchet MS', fontSize: '16px', fontStyle: 'bold', color: '#fff'
           });
-          const descText = this.add.text(ZONE.mid.cx - 110, y + 8, item.desc, {
+          const descText = this.add.text(600 - 115, y + 8, item.desc, {
             fontFamily: 'Trebuchet MS', fontSize: '12px', color: '#aaa'
           });
-          const costText = this.add.text(ZONE.mid.cx + 150, y, `${item.cost} scrap`, {
+          const costText = this.add.text(600 + 155, y, `${item.cost} scrap`, {
             fontFamily: 'Trebuchet MS', fontSize: '14px', fontStyle: 'bold', color: canAfford ? '#ffdd44' : '#ff6666'
           }).setOrigin(0.5);
 
@@ -492,40 +461,32 @@
       aiShop() {
         if (this.gameOver) return;
         const p = this.p2;
-        // AI prioritizes potion if low HP, else weapon
-        if (p.health < 40 && p.scrap >= 20) {
+        if (p.health < 60 && p.scrap >= 20) {
           p.scrap -= 20; p.health = Math.min(p.maxHealth, p.health + 40);
         } else if (!p.weapon && p.scrap >= 30) {
           p.scrap -= 30; p.weapon = 'gun';
         } else if (!p.weapon && p.scrap >= 45) {
           p.scrap -= 45; p.weapon = 'katana';
-        } else if (p.weapon === 'gun' && p.scrap >= 35) {
+        } else if (p.armor < 3 && p.scrap >= 35) {
           p.scrap -= 35; p.armor = Math.min(3, p.armor + 1);
         }
         this.updateHUD();
       }
 
       buildTouchControls() {
-        const btnSize = 56;
-        const alpha = 0.35;
+        const btnSize = 56, alpha = 0.35;
 
-        // P1 D-pad
-        const p1BaseX = 70, p1BaseY = GAME_HEIGHT - 160;
-        this.makeBtn(p1BaseX - 30, p1BaseY + 30, btnSize, alpha, '◀', () => this.touchState.p1Left = true, () => this.touchState.p1Left = false);
-        this.makeBtn(p1BaseX + 40, p1BaseY + 30, btnSize, alpha, '▶', () => this.touchState.p1Right = true, () => this.touchState.p1Right = false);
-        this.makeBtn(p1BaseX + 5, p1BaseY - 30, btnSize, alpha, '▲', () => this.touchState.p1Up = true, () => this.touchState.p1Up = false);
-        this.makeBtn(p1BaseX + 5, p1BaseY + 90, btnSize, alpha, '▼', () => this.touchState.p1Down = true, () => this.touchState.p1Down = false);
+        // P1
+        const p1X = 80, p1Y = GAME_HEIGHT - 150;
+        this.makeBtn(p1X - 30, p1Y + 30, btnSize, alpha, '◀', () => this.touchState.p1Left = true, () => this.touchState.p1Left = false);
+        this.makeBtn(p1X + 40, p1Y + 30, btnSize, alpha, '▶', () => this.touchState.p1Right = true, () => this.touchState.p1Right = false);
+        this.makeBtn(p1X + 5, p1Y - 40, btnSize + 12, 0.55, '⚔', () => this.touchState.p1Action = true, () => this.touchState.p1Action = false, 0xcc3333);
 
-        // P1 action
-        this.makeBtn(p1BaseX + 5, p1BaseY - 100, btnSize + 10, 0.55, '⚔', () => this.touchState.p1Action = true, () => this.touchState.p1Action = false, 0xcc3333);
-
-        // P2 D-pad
-        const p2BaseX = GAME_WIDTH - 70, p2BaseY = GAME_HEIGHT - 160;
-        this.makeBtn(p2BaseX - 40, p2BaseY + 30, btnSize, alpha, '◀', () => this.touchState.p2Left = true, () => this.touchState.p2Left = false);
-        this.makeBtn(p2BaseX + 30, p2BaseY + 30, btnSize, alpha, '▶', () => this.touchState.p2Right = true, () => this.touchState.p2Right = false);
-        this.makeBtn(p2BaseX - 5, p2BaseY - 30, btnSize, alpha, '▲', () => this.touchState.p2Up = true, () => this.touchState.p2Up = false);
-        this.makeBtn(p2BaseX - 5, p2BaseY + 90, btnSize, alpha, '▼', () => this.touchState.p2Down = true, () => this.touchState.p2Down = false);
-        this.makeBtn(p2BaseX - 5, p2BaseY - 100, btnSize + 10, 0.55, '⚔', () => this.touchState.p2Action = true, () => this.touchState.p2Action = false, 0x3355cc);
+        // P2
+        const p2X = GAME_WIDTH - 80, p2Y = GAME_HEIGHT - 150;
+        this.makeBtn(p2X - 40, p2Y + 30, btnSize, alpha, '◀', () => this.touchState.p2Left = true, () => this.touchState.p2Left = false);
+        this.makeBtn(p2X + 30, p2Y + 30, btnSize, alpha, '▶', () => this.touchState.p2Right = true, () => this.touchState.p2Right = false);
+        this.makeBtn(p2X - 5, p2Y - 40, btnSize + 12, 0.55, '⚔', () => this.touchState.p2Action = true, () => this.touchState.p2Action = false, 0x3355cc);
       }
 
       makeBtn(x, y, size, alpha, label, onDown, onUp, color = 0xffffff) {
@@ -534,7 +495,6 @@
         btn.on('pointerdown', onDown);
         btn.on('pointerup', onUp);
         btn.on('pointerout', onUp);
-        return btn;
       }
 
       getAIName() {
@@ -550,14 +510,9 @@
         else if (roll <= 70) { isTrash = true; def = Phaser.Utils.Array.GetRandom(this.trashItems); }
         else { def = Phaser.Utils.Array.GetRandom(this.nonTrashItems); }
 
-        // Spawn in either P1 or P2 zone
-        const inP1 = Math.random() < 0.5;
-        const zone = inP1 ? ZONE.p1 : ZONE.p2;
-        const x = Phaser.Math.Between(zone.x + 30, zone.x + zone.w - 30);
-
+        const x = Phaser.Math.Between(30, GAME_WIDTH - 30);
         const sprite = this.add.sprite(x, -40, def.key).setDepth(5);
 
-        // Glow
         if (isTrash) {
           sprite.setTint(0xff9999);
           this.tweens.add({ targets: sprite, scaleX: { from: 1, to: 1.15 }, scaleY: { from: 1, to: 1.15 }, duration: 500, yoyo: true, repeat: -1 });
@@ -569,7 +524,7 @@
         }
 
         this.fallingItems.push({
-          sprite, def, isTrash, isAnvil, zone: inP1 ? 'p1' : 'p2',
+          sprite, def, isTrash, isAnvil,
           speed: isAnvil ? 200 : Phaser.Math.Between(140, 240),
           vx: isAnvil ? 0 : Phaser.Math.Between(-15, 15)
         });
@@ -582,13 +537,13 @@
         this.p2HealthText.setText(Math.max(0, Math.round(this.p2.health)));
         this.p1ScrapText.setText('Scrap: ' + this.p1.scrap);
         this.p2ScrapText.setText('Scrap: ' + this.p2.scrap);
-        this.p1WeaponText.setText(this.p1.weapon ? '🔫 ' + (this.p1.weapon === 'gun' ? 'Auto Gun' : 'Katana') : 'No weapon');
-        this.p2WeaponText.setText(this.p2.weapon ? '🔫 ' + (this.p2.weapon === 'gun' ? 'Auto Gun' : 'Katana') : 'No weapon');
+        this.p1WeaponText.setText(this.p1.weapon ? (this.p1.weapon === 'gun' ? '🔫 Auto Gun' : '⚔ Katana') + (this.p1.armor > 0 ? ` · 🛡${this.p1.armor}` : '') : 'No weapon');
+        this.p2WeaponText.setText(this.p2.weapon ? (this.p2.weapon === 'gun' ? '🔫 Auto Gun' : '⚔ Katana') + (this.p2.armor > 0 ? ` · 🛡${this.p2.armor}` : '') : 'No weapon');
 
         const p1Pct = Math.max(0, this.p1.health / this.p1.maxHealth);
         const p2Pct = Math.max(0, this.p2.health / this.p2.maxHealth);
-        this.p1HealthFill.setDisplaySize(200 * p1Pct, 14);
-        this.p2HealthFill.setDisplaySize(200 * p2Pct, 14);
+        this.p1HealthFill.setDisplaySize(220 * p1Pct, 16);
+        this.p2HealthFill.setDisplaySize(220 * p2Pct, 16);
         this.p1HealthFill.setFillStyle(p1Pct > 0.5 ? 0x44ff44 : p1Pct > 0.25 ? 0xffaa44 : 0xff4444);
         this.p2HealthFill.setFillStyle(p2Pct > 0.5 ? 0x44ff44 : p2Pct > 0.25 ? 0xffaa44 : 0xff4444);
       }
@@ -605,67 +560,45 @@
         if (this.gameOver) return;
         const dt = delta / 1000;
 
-        // ---- Movement ----
+        // Movement — free movement everywhere
         this.handleMovement('p1', dt);
         if (this.mode === '2p') this.handleMovement('p2', dt);
         else this.handleAI(dt);
 
-        // ---- Battle detection ----
-        this.p1.inBattle = this.p1.x > ZONE.mid.x;
-        this.p2.inBattle = this.p2.x < ZONE.mid.x + ZONE.mid.w;
-
-        // ---- Attack/fire ----
+        // Attacks
         if (!this.p1.stunned) {
           this.p1.attackCooldown -= delta;
           this.p1.fireCooldown -= delta;
-
-          const p1Action = this.keys.w.isDown || this.touchState.p1Action;
-          if (p1Action && this.p1.inBattle && this.p1.weapon) {
-            if (this.p1.weapon === 'katana' && this.p1.attackCooldown <= 0) {
-              this.meleeAttack('p1'); this.p1.attackCooldown = 600;
-            } else if (this.p1.weapon === 'gun' && this.p1.fireCooldown <= 0) {
-              this.fireBullet('p1'); this.p1.fireCooldown = 400;
-            }
+          const act = this.keys.w.isDown || this.touchState.p1Action;
+          if (act && this.p1.weapon) {
+            if (this.p1.weapon === 'katana' && this.p1.attackCooldown <= 0) { this.meleeAttack('p1'); this.p1.attackCooldown = 700; }
+            else if (this.p1.weapon === 'gun' && this.p1.fireCooldown <= 0) { this.fireBullet('p1'); this.p1.fireCooldown = 550; }
           }
         }
 
         if (!this.p2.stunned) {
           this.p2.attackCooldown -= delta;
           this.p2.fireCooldown -= delta;
-
-          const p2Action = this.mode === '2p'
+          const act = this.mode === '2p'
             ? (this.keys.up.isDown || this.touchState.p2Action)
-            : this.p2.inBattle && this.p2.weapon && Math.abs(this.p2.x - this.p1.x) < 250;
-
-          if (p2Action && this.p2.inBattle && this.p2.weapon) {
-            if (this.p2.weapon === 'katana' && this.p2.attackCooldown <= 0) {
-              this.meleeAttack('p2'); this.p2.attackCooldown = 600;
-            } else if (this.p2.weapon === 'gun' && this.p2.fireCooldown <= 0) {
-              this.fireBullet('p2'); this.p2.fireCooldown = 500;
-            }
+            : (this.p2.weapon && Math.abs(this.p2.x - this.p1.x) < 400);
+          if (act && this.p2.weapon) {
+            if (this.p2.weapon === 'katana' && this.p2.attackCooldown <= 0 && Math.abs(this.p2.x - this.p1.x) < 150) { this.meleeAttack('p2'); this.p2.attackCooldown = 700; }
+            else if (this.p2.weapon === 'gun' && this.p2.fireCooldown <= 0) { this.fireBullet('p2'); this.p2.fireCooldown = 650; }
           }
         }
 
-        // ---- Update sprites ----
         this.updateSprites(delta);
-
-        // ---- Falling items ----
         this.updateItems(dt);
-
-        // ---- Bullets ----
         this.updateBullets(dt);
-
-        // ---- Stun timers ----
         this.updateStun('p1', delta);
         this.updateStun('p2', delta);
-
         this.updateHUD();
       }
 
       handleMovement(side, dt) {
         const p = side === 'p1' ? this.p1 : this.p2;
         if (p.stunned) { p.vx = 0; return; }
-
         let mx = 0;
         if (side === 'p1') {
           if (this.keys.a.isDown || this.touchState.p1Left) mx -= 1;
@@ -683,36 +616,27 @@
         const p = this.p2;
         if (p.stunned) { p.vx = 0; return; }
 
-        // If has weapon and enough health, go to battleground to fight
-        if (p.weapon && p.health > 30) {
-          // Move towards battleground center
-          const targetX = ZONE.mid.cx;
-          const dx = targetX - p.x;
-          if (Math.abs(dx) > 10) {
-            p.vx = Math.sign(dx) * 220;
+        // If has weapon and player is nearby, fight. Otherwise collect.
+        const distToP1 = Math.abs(p.x - this.p1.x);
+        if (p.weapon && distToP1 < 500) {
+          // Move toward player
+          const dx = this.p1.x - p.x;
+          if (Math.abs(dx) > 80) {
+            p.vx = Math.sign(dx) * 230;
             p.facing = Math.sign(dx);
           } else {
             p.vx = 0;
-            // Move towards player if in battleground
-            if (this.p1.inBattle) {
-              const dxP = this.p1.x - p.x;
-              if (Math.abs(dxP) > 80) {
-                p.vx = Math.sign(dxP) * 200;
-                p.facing = Math.sign(dxP);
-              }
-            }
           }
         } else {
-          // Collect in own zone
-          let targetX = p.x;
-          let bestDist = Infinity;
+          // Collect nearest trash
+          let targetX = p.x, bestDist = Infinity;
           for (const item of this.fallingItems) {
-            if (item.zone === 'p2' && item.isTrash) {
+            if (item.isTrash) {
               const d = Math.abs(item.sprite.x - p.x) + Math.abs(item.sprite.y - p.y) * 0.3;
               if (d < bestDist) { bestDist = d; targetX = item.sprite.x; }
             }
           }
-          if (bestDist === Infinity) targetX = ZONE.p2.cx;
+          if (bestDist === Infinity) targetX = 1000;
           const dx = targetX - p.x;
           if (Math.abs(dx) > 6) {
             p.vx = Math.sign(dx) * 240;
@@ -721,8 +645,7 @@
             p.vx = 0;
           }
         }
-
-        p.x = Phaser.Math.Clamp(p.x + p.vx * dt, ZONE.p2.x + 20, GAME_WIDTH - 20);
+        p.x = Phaser.Math.Clamp(p.x + p.vx * dt, 20, GAME_WIDTH - 20);
       }
 
       updateSprites(delta) {
@@ -747,19 +670,12 @@
           item.sprite.x += item.vx * dt;
           item.sprite.rotation += 0.02;
 
-          // Collision with players (only in their own zones OR battleground)
-          const p1Active = item.zone === 'p1' && this.p1.x < ZONE.mid.x + 50;
-          const p2Active = item.zone === 'p2' && this.p2.x > ZONE.mid.x + ZONE.mid.w - 50;
+          const d1 = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p1.x, this.p1.y - 20);
+          const d2 = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p2.x, this.p2.y - 20);
 
           let caught = false;
-          if (p1Active) {
-            const d = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p1.x, this.p1.y - 20);
-            if (d < 42) { this.handleCatch(item, 'p1'); caught = true; }
-          }
-          if (!caught && p2Active) {
-            const d = Phaser.Math.Distance.Between(item.sprite.x, item.sprite.y, this.p2.x, this.p2.y - 20);
-            if (d < 42) { this.handleCatch(item, 'p2'); caught = true; }
-          }
+          if (d1 < 42) { this.handleCatch(item, 'p1'); caught = true; }
+          else if (d2 < 42) { this.handleCatch(item, 'p2'); caught = true; }
 
           if (caught || item.sprite.y > GAME_HEIGHT + 50) {
             item.sprite.destroy();
@@ -778,7 +694,7 @@
           const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, target.x, target.y - 20);
 
           if (d < 30) {
-            const dmg = Math.max(2, 10 - target.armor * 3);
+            const dmg = Math.max(2, 6 - target.armor * 2);
             target.health -= dmg;
             this.showFloatingText(target.x, target.y - 60, `-${dmg}`, '#ff4444');
             b.sprite.destroy();
@@ -798,7 +714,6 @@
         const p = side === 'p1' ? this.p1 : this.p2;
         const text = side === 'p1' ? this.p1StunText : this.p2StunText;
         const sprite = side === 'p1' ? this.p1Sprite : this.p2Sprite;
-
         if (p.stunned) {
           p.stunTimer -= delta;
           if (p.stunTimer <= 0) {
@@ -813,38 +728,27 @@
         const p = side === 'p1' ? this.p1 : this.p2;
         const target = side === 'p1' ? this.p2 : this.p1;
         const angle = Phaser.Math.Angle.Between(p.x, p.y - 20, target.x, target.y - 20);
-
         const sprite = this.add.sprite(p.x + Math.cos(angle) * 30, p.y - 20 + Math.sin(angle) * 20, 'bullet').setDepth(15);
-        this.bullets.push({
-          sprite, vx: Math.cos(angle) * 500, vy: Math.sin(angle) * 500, owner: side
-        });
+        this.bullets.push({ sprite, vx: Math.cos(angle) * 500, vy: Math.sin(angle) * 500, owner: side });
       }
 
       meleeAttack(side) {
         const attacker = side === 'p1' ? this.p1 : this.p2;
         const defender = side === 'p1' ? this.p2 : this.p1;
+        if (Math.abs(attacker.x - defender.x) > 140) return;
 
-        if (Math.abs(attacker.x - defender.x) > 130) return;
-
-        const dmg = Math.max(3, 18 - defender.armor * 4);
+        const dmg = Math.max(3, 12 - defender.armor * 3);
         defender.health -= dmg;
         defender.stunned = true;
         defender.stunTimer = 600;
 
-        if (side === 'p1') {
-          this.p2StunText.setVisible(true);
-          this.p2Sprite.setTint(0xff4444);
-        } else {
-          this.p1StunText.setVisible(true);
-          this.p1Sprite.setTint(0xff4444);
-        }
+        if (side === 'p1') { this.p2StunText.setVisible(true); this.p2Sprite.setTint(0xff4444); }
+        else { this.p1StunText.setVisible(true); this.p1Sprite.setTint(0xff4444); }
 
-        // Slash visual
         const slash = this.add.sprite(attacker.x + 30 * attacker.facing, attacker.y - 20, 'slash').setDepth(40).setFlipX(attacker.facing < 0);
         this.tweens.add({ targets: slash, alpha: 0, scaleX: 2, duration: 250, onComplete: () => slash.destroy() });
 
         this.showFloatingText(defender.x, defender.y - 70, `-${dmg}`, '#ff4444');
-
         if (defender.health <= 0) this.endGame(side);
       }
 
@@ -852,7 +756,7 @@
         const p = side === 'p1' ? this.p1 : this.p2;
 
         if (item.isAnvil) {
-          const dmg = Phaser.Math.Between(20, 40);
+          const dmg = Phaser.Math.Between(12, 25);
           p.health -= dmg;
           p.stunned = true;
           p.stunTimer = 1500;
@@ -886,7 +790,6 @@
           fontFamily: 'Trebuchet MS', fontSize: '56px', fontStyle: 'bold', color,
           stroke: '#000', strokeThickness: 8
         }).setOrigin(0.5).setDepth(301);
-
         this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 10, `P1: ${this.p1.score} pts  |  P2: ${this.p2.score} pts`, {
           fontFamily: 'Trebuchet MS', fontSize: '24px', color: '#fff'
         }).setOrigin(0.5).setDepth(301);
